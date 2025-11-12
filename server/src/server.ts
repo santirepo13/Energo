@@ -7,7 +7,8 @@ import { createPool, Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const HOST = process.env.HOST || '0.0.0.0';
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'insecure-dev-secret';
 const DEFAULT_COST_PER_KWH = 900; // COP
 
@@ -347,25 +348,131 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
     })
     .catch((_e) => res.status(500).json({ error: 'Authorization check failed' }));
 }
+// Authorization helper: audit role only
+function requireAudit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const userId = (req.session as any)?.userId as number | undefined;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  getUserRoleAndStatus(userId)
+    .then((info) => {
+      if (!info || info.role !== 'audit') {
+        return res.status(403).json({ error: 'Audit only' });
+      }
+      next();
+    })
+    .catch((_e) => res.status(500).json({ error: 'Authorization check failed' }));
+}
+
+// Audit: list admins
+app.get('/api/audit/admins', requireAuth, requireAudit, async (_req: express.Request, res: express.Response) => {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT u.id, u.username, u.email, u.created_at, u.last_login,
+              r.name AS role, s.name AS status
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE r.name = 'admin'
+       ORDER BY u.created_at DESC`
+    );
+    res.json({ users: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list admins' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Audit: update admin status
+app.patch('/api/audit/users/:id/status', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  const { status } = req.body as { status?: string };
+  if (!id || !status) return res.status(400).json({ error: 'Invalid request' });
+  const conn = await pool.getConnection();
+  try {
+    // Ensure target user is admin
+    const [roleRows] = await conn.execute<RowDataPacket[]>(
+      'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
+      [id]
+    );
+    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
+    const targetRole = ((roleRows as any[])[0] as any).role as string | null;
+    if (targetRole !== 'admin') return res.status(403).json({ error: 'Can only modify admin users' });
+
+    // validate allowed statuses
+    const allowed = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const [srows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
+      [status]
+    );
+    if ((srows as any[]).length === 0) return res.status(400).json({ error: 'Status not found' });
+    const statusId = Number((srows as any[])[0].id);
+    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [statusId, id]);
+    res.json({ message: 'Status updated' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update status' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Audit: sales metrics over time (independent of current cost setting)
+app.get('/api/audit/metrics', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
+  const days = Math.max(1, Math.min(365, Number((req.query.days as string) ?? 30) || 30));
+  const conn = await pool.getConnection();
+  try {
+    const [totalsRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS pins, COALESCE(SUM(amount),0) AS total_amount, COALESCE(SUM(kwh),0) AS total_kwh
+       FROM recharge_pins`
+    );
+    const totals = (totalsRows as any[])[0] || { pins: 0, total_amount: 0, total_kwh: 0 };
+
+    const [seriesRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT DATE(created_at) AS day,
+              COUNT(*) AS pins,
+              COALESCE(SUM(amount),0) AS amount,
+              COALESCE(SUM(kwh),0) AS kwh
+       FROM recharge_pins
+       WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY DATE(created_at) ASC`,
+      [days]
+    );
+
+    res.json({
+      totals: {
+        codes_sold: Number(totals.pins) || 0,
+        amount_cop: Number(totals.total_amount) || 0,
+        kwh: Number(totals.total_kwh) || 0,
+      },
+      by_day: (seriesRows as any[]).map((r) => ({
+        day: r.day instanceof Date ? (r.day as Date).toISOString().slice(0, 10) : String(r.day),
+        codes_sold: Number(r.pins) || 0,
+        amount_cop: Number(r.amount) || 0,
+        kwh: Number(r.kwh) || 0,
+      })),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load metrics' });
+  } finally {
+    conn.release();
+  }
+});
 
 app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express.Response) => {
   const userId = (req.session as any).userId as number;
   const username = (req.session as any).username as string;
   const conn = await pool.getConnection();
   try {
-    const [cardRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? LIMIT 1',
-      [userId]
-    );
-    const card = (cardRows as any[])[0] || null;
-    const [pins] = await conn.execute<RowDataPacket[]>(
-      'SELECT pin_code, amount, kwh, created_at, card_number FROM recharge_pins WHERE user_id = ? ORDER BY created_at DESC',
-      [userId]
-    );
-    const [logs] = await conn.execute<RowDataPacket[]>(
-      'SELECT event_type, event_time, ip_address, details FROM security_logs WHERE username = ? ORDER BY event_time DESC LIMIT 100',
-      [username]
-    );
+    // Fetch role/status first so we can tailor the dashboard by role
     const [infoRows] = await conn.execute<RowDataPacket[]>(
       `SELECT u.username, r.name AS role_name, s.name AS status_name
        FROM users u
@@ -376,6 +483,49 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
       [userId]
     );
     const info = (infoRows as any[])[0] || { username, role_name: null, status_name: null };
+    const role = (info.role_name ?? null) as string | null;
+
+    let card: any = null;
+    let pins: any[] = [];
+    let logs: any[] = [];
+
+    if (role === 'admin') {
+      // Admin: show global "Últimos movimientos" (all users), hide logs and card
+      const [pinRows] = await conn.execute<RowDataPacket[]>(
+        'SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number FROM recharge_pins rp LEFT JOIN users u ON u.id = rp.user_id ORDER BY rp.created_at DESC LIMIT 100'
+      );
+      pins = pinRows as any[];
+      // logs remain empty; card remains null
+    } else if (role === 'audit') {
+      // Audit: show global security logs for all users, hide card and recharge history
+      const [logRows] = await conn.execute<RowDataPacket[]>(
+        'SELECT event_type, event_time, ip_address, details FROM security_logs ORDER BY event_time DESC LIMIT 200'
+      );
+      logs = logRows as any[];
+    } else {
+      // Regular user: own card, own history, and hide logs
+      const [cardRows] = await conn.execute<RowDataPacket[]>(
+        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? LIMIT 1',
+        [userId]
+      );
+      card = (cardRows as any[])[0] || null;
+
+      const [pinRows] = await conn.execute<RowDataPacket[]>(
+        'SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number FROM recharge_pins rp LEFT JOIN users u ON u.id = rp.user_id WHERE rp.user_id = ? ORDER BY rp.created_at DESC',
+        [userId]
+      );
+      pins = pinRows as any[];
+
+      // Hide logs for non-audit roles
+      logs = [];
+      // If you want per-user logs instead, replace the above with:
+      // const [logRows] = await conn.execute<RowDataPacket[]>(
+      //   'SELECT event_type, event_time, ip_address, details FROM security_logs WHERE username = ? ORDER BY event_time DESC LIMIT 100',
+      //   [username]
+      // );
+      // logs = logRows as any[];
+    }
+
     const costPerKwh = await getCostPerKwh(conn);
     res.json({
       current_user: { username: info.username, role: info.role_name, status: info.status_name },
@@ -494,6 +644,7 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (_req: express.Requ
        FROM users u
        LEFT JOIN roles r ON r.id = u.role_id
        LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE r.name <> 'audit'
        ORDER BY u.created_at DESC`
     );
     res.json({ users: rows });
@@ -512,6 +663,15 @@ app.patch('/api/admin/users/:id/email', requireAuth, requireAdmin, async (req: e
   if (!id || !email) return res.status(400).json({ error: 'Invalid request' });
   const conn = await pool.getConnection();
   try {
+    // Block modifications to audit users
+    const [roleRows] = await conn.execute<RowDataPacket[]>(
+      'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
+      [id]
+    );
+    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
+    const targetRole = ((roleRows as any[])[0] as any).role as string | null;
+    if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
+
     // ensure not taken
     const [rows] = await conn.execute<RowDataPacket[]>(
       'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
@@ -535,6 +695,15 @@ app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req: 
   if (!id || !status) return res.status(400).json({ error: 'Invalid request' });
   const conn = await pool.getConnection();
   try {
+    // Block modifications to audit users
+    const [roleRows] = await conn.execute<RowDataPacket[]>(
+      'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
+      [id]
+    );
+    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
+    const targetRole = ((roleRows as any[])[0] as any).role as string | null;
+    if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
+
     // validate allowed statuses
     const allowed = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
     if (!allowed.includes(status)) {
@@ -562,12 +731,15 @@ app.post('/api/admin/users/:id/send-reset', requireAuth, requireAdmin, async (re
   if (!id) return res.status(400).json({ error: 'Invalid user id' });
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT username, email FROM users WHERE id = ? LIMIT 1',
+    // Block actions on audit users
+    const [roleRows] = await conn.execute<RowDataPacket[]>(
+      'SELECT u.username, u.email, r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
       [id]
     );
-    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
-    const u = (rows as any[])[0] as any;
+    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
+    const u = (roleRows as any[])[0] as any;
+    if ((u.role as string | null) === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
+
     const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     const resetLink = `${CLIENT_ORIGIN}/reset-password?token=${token}`;
     await logSecurity('password_reset_link', u.username, clientIp(req), { user_id: id, email: u.email, reset_link: resetLink });
@@ -603,6 +775,6 @@ app.use(async (err: any, req: express.Request, res: express.Response, next: expr
   next(err);
 });
 
-app.listen(PORT, () => {
-  console.log(`Energo backend listening on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Energo backend listening on http://${HOST}:${PORT}`);
 });

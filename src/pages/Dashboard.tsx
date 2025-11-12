@@ -23,14 +23,16 @@ import {
   Typography,
   InputAdornment,
   Chip,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
 import logo from '../assets/logo.png';
-import type { DashboardResponse } from '../api/client';
-import { getDashboard, recharge } from '../api/client';
+import type { DashboardResponse, AuditMetrics, AdminUserRow } from '../api/client';
+import { getDashboard, recharge, auditListAdmins, auditUpdateStatus, auditGetMetrics } from '../api/client';
 
 const currencyCOP = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -61,6 +63,42 @@ export default function Dashboard() {
   const cost = data?.cost_per_kwh ?? 900;
   const userStatus = data?.current_user?.status ?? null;
   const isPaused = userStatus === 'Pausa';
+  const role = data?.current_user?.role ?? null;
+  const isAdmin = role === 'admin';
+  const showCardAndRecharge = role !== 'admin' && role !== 'audit';
+  const showHistory = role !== 'audit'; // admin + regular users
+  const showLogs = role === 'audit';    // only auditors
+
+  const STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
+
+  // Audit state
+  const [auditMetrics, setAuditMetrics] = useState<AuditMetrics | null>(null);
+  const [auditAdmins, setAuditAdmins] = useState<AdminUserRow[]>([]);
+  const [auditSaving, setAuditSaving] = useState<Record<number, boolean>>({});
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  async function loadAuditData() {
+    try {
+      const [m, a] = await Promise.all([auditGetMetrics(30), auditListAdmins()]);
+      setAuditMetrics(m);
+      setAuditAdmins(a.users);
+    } catch (e: any) {
+      setAuditError(e?.response?.data?.error || e?.message || 'Error al cargar métricas/administradores');
+    }
+  }
+
+  async function handleAuditChangeStatus(userId: number, status: typeof STATUS_OPTIONS[number]) {
+    setAuditSaving((prev) => ({ ...prev, [userId]: true }));
+    setAuditError(null);
+    try {
+      await auditUpdateStatus(userId, status);
+      setAuditAdmins((prev) => prev.map((u) => (u.id === userId ? { ...u, status } : u)));
+    } catch (e: any) {
+      setAuditError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el estado');
+    } finally {
+      setAuditSaving((prev) => ({ ...prev, [userId]: false }));
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -69,6 +107,9 @@ export default function Dashboard() {
         const d = await getDashboard();
         if (mounted) {
           setData(d);
+        }
+        if ((d?.current_user?.role ?? null) === 'audit') {
+          await loadAuditData();
         }
       } catch (e: any) {
         setError(e?.response?.data?.error || e?.message || 'Error al cargar el panel');
@@ -186,15 +227,15 @@ export default function Dashboard() {
         )}
       </Stack>
 
-      {isPaused && (
+      {isPaused && showCardAndRecharge && (
         <Alert severity="warning">
           Su cuenta está en Pausa. Las recargas están deshabilitadas temporalmente.
         </Alert>
       )}
 
-      {!card && <Alert severity="warning">No se encontró tarjeta de energía asociada al usuario.</Alert>}
+      {!card && showCardAndRecharge && <Alert severity="warning">No se encontró tarjeta de energía asociada al usuario.</Alert>}
 
-      {card && (
+      {card && showCardAndRecharge && (
         <Box
           sx={{
             display: 'grid',
@@ -288,78 +329,191 @@ export default function Dashboard() {
         </Box>
       )}
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-        <Paper sx={{ p: 2 }}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <HistoryIcon color="primary" />
-            <Typography variant="h6">Historial de Recargas</Typography>
-          </Stack>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Fecha</TableCell>
-                <TableCell>PIN</TableCell>
-                <TableCell align="right">Monto (COP)</TableCell>
-                <TableCell align="right">kWh</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(data?.recharge_history ?? []).map((r, idx) => (
-                <TableRow key={idx}>
-                  <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <code style={{ letterSpacing: 1 }}>{r.pin_code}</code>
-                  </TableCell>
-                  <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
-                  <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
-                </TableRow>
-              ))}
-              {(!data || data.recharge_history.length === 0) && (
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: showHistory && showLogs ? '1fr 1fr' : '1fr' } }}>
+        {showHistory && (
+          <Paper sx={{ p: 2 }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <HistoryIcon color="primary" />
+              <Typography variant="h6">{role === 'admin' ? 'Últimos movimientos' : 'Historial de Recargas'}</Typography>
+            </Stack>
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    Sin recargas todavía.
-                  </TableCell>
+                  <TableCell>Fecha</TableCell>
+                  <TableCell>PIN</TableCell>
+                  {isAdmin && <TableCell align="right">Usuario ID</TableCell>}
+                  {isAdmin && <TableCell>Correo</TableCell>}
+                  <TableCell align="right">Monto (COP)</TableCell>
+                  <TableCell align="right">kWh</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Paper>
+              </TableHead>
+              <TableBody>
+                {(data?.recharge_history ?? []).map((r, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <code style={{ letterSpacing: 1 }}>{r.pin_code}</code>
+                    </TableCell>
+                    {isAdmin && <TableCell align="right">{r.user_id ?? '—'}</TableCell>}
+                    {isAdmin && (
+                      <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {r.email ?? '—'}
+                      </TableCell>
+                    )}
+                    <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
+                    <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+                {(!data || data.recharge_history.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={isAdmin ? 6 : 4} align="center">
+                      Sin recargas todavía.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Paper>
+        )}
+ 
+        {showLogs && (
+          <Stack spacing={2}>
+            {auditError && <Alert severity="error">{auditError}</Alert>}
 
-        <Paper sx={{ p: 2 }}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <SecurityIcon color="primary" />
-            <Typography variant="h6">Registros de Seguridad</Typography>
-          </Stack>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Fecha</TableCell>
-                <TableCell>Evento</TableCell>
-                <TableCell>IP</TableCell>
-                <TableCell>Detalles</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(data?.security_logs ?? []).map((l, idx) => (
-                <TableRow key={idx}>
-                  <TableCell>{new Date(l.event_time).toLocaleString()}</TableCell>
-                  <TableCell>{l.event_type}</TableCell>
-                  <TableCell>{l.ip_address}</TableCell>
-                  <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {l.details}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(!data || data.security_logs.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    Sin eventos registrados.
-                  </TableCell>
-                </TableRow>
+            <Paper sx={{ p: 2, bgcolor: '#000', color: '#fff' }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <SecurityIcon sx={{ color: '#90caf9' }} />
+                <Typography variant="h6" color="inherit">Métricas de Ventas (todas)</Typography>
+              </Stack>
+              {!auditMetrics ? (
+                <Typography color="inherit">Cargando métricas…</Typography>
+              ) : (
+                <Stack spacing={2}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Chip label={`Códigos vendidos: ${auditMetrics.totals.codes_sold}`} sx={{ bgcolor: '#111', color: '#fff' }} />
+                    <Chip label={`kWh vendidos: ${Number(auditMetrics.totals.kwh).toFixed(2)}`} sx={{ bgcolor: '#111', color: '#fff' }} />
+                    <Chip label={`Monto (COP): ${formatCOP(Number(auditMetrics.totals.amount_cop))}`} sx={{ bgcolor: '#111', color: '#fff' }} />
+                  </Stack>
+                  <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(255,255,255,0.12)', color: 'inherit' } }}>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: 'rgba(255,255,255,0.06)' }}>
+                        <TableCell>Día</TableCell>
+                        <TableCell align="right">Códigos</TableCell>
+                        <TableCell align="right">kWh</TableCell>
+                        <TableCell align="right">Monto (COP)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(auditMetrics.by_day ?? []).map((r, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{r.day}</TableCell>
+                          <TableCell align="right">{r.codes_sold}</TableCell>
+                          <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
+                          <TableCell align="right">{formatCOP(Number(r.amount_cop))}</TableCell>
+                        </TableRow>
+                      ))}
+                      {auditMetrics.by_day.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={4} align="center">Sin datos.</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </Stack>
               )}
-            </TableBody>
-          </Table>
-        </Paper>
+            </Paper>
+
+            <Paper sx={{ p: 2, bgcolor: '#000', color: '#fff' }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <SecurityIcon sx={{ color: '#90caf9' }} />
+                <Typography variant="h6" color="inherit">Registros de Seguridad (todos los usuarios)</Typography>
+              </Stack>
+              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(255,255,255,0.12)', color: 'inherit' } }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'rgba(255,255,255,0.06)' }}>
+                    <TableCell>Fecha</TableCell>
+                    <TableCell>Evento</TableCell>
+                    <TableCell>IP</TableCell>
+                    <TableCell>Detalles</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(data?.security_logs ?? []).map((l, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{new Date(l.event_time).toLocaleString()}</TableCell>
+                      <TableCell>{l.event_type}</TableCell>
+                      <TableCell>{l.ip_address}</TableCell>
+                      <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {l.details}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!data || data.security_logs.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        Sin eventos registrados.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+
+            <Paper sx={{ p: 2, bgcolor: '#000', color: '#fff' }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <SecurityIcon sx={{ color: '#90caf9' }} />
+                <Typography variant="h6" color="inherit">Administradores - Cambiar estado</Typography>
+              </Stack>
+              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(255,255,255,0.12)', color: 'inherit' } }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'rgba(255,255,255,0.06)' }}>
+                    <TableCell>Usuario</TableCell>
+                    <TableCell>Correo</TableCell>
+                    <TableCell>Estado</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(auditAdmins ?? []).map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography fontWeight={600} color="inherit">{u.username}</Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {u.email ?? '—'}
+                      </TableCell>
+                      <TableCell width={220}>
+                        <Select
+                          size="small"
+                          fullWidth
+                          value={u.status || 'Activo'}
+                          onChange={(e) => handleAuditChangeStatus(u.id, (e.target.value as any))}
+                          disabled={!!auditSaving[u.id]}
+                          sx={{
+                            color: 'inherit',
+                            '& .MuiSelect-icon': { color: 'inherit' },
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.23)' },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
+                          }}
+                        >
+                          {STATUS_OPTIONS.map((s) => (
+                            <MenuItem key={s} value={s}>{s}</MenuItem>
+                          ))}
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {auditAdmins.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center">Sin administradores.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          </Stack>
+        )}
       </Box>
     </Stack>
   );

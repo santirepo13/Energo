@@ -37,6 +37,8 @@ export type DashboardResponse = {
     current_kwh: number;
   } | null;
   recharge_history: Array<{
+    user_id?: number;
+    email?: string | null;
     pin_code: string;
     amount: number;
     kwh: number;
@@ -113,4 +115,38 @@ export async function adminUpdateStatus(
 export async function adminSendReset(id: number) {
   const res = await api.post(`/admin/users/${id}/send-reset`);
   return res.data as { message: string; link: string };
+}
+
+// ==== Auditor Types & API ====
+
+export type AuditMetrics = {
+  totals: {
+    codes_sold: number;
+    amount_cop: number;
+    kwh: number;
+  };
+  by_day: Array<{
+    day: string;           // YYYY-MM-DD
+    codes_sold: number;
+    amount_cop: number;
+    kwh: number;
+  }>;
+};
+
+export async function auditListAdmins() {
+  const res = await api.get('/audit/admins');
+  return res.data as { users: AdminUserRow[] };
+}
+
+export async function auditUpdateStatus(
+  id: number,
+  status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
+) {
+  const res = await api.patch(`/audit/users/${id}/status`, { status });
+  return res.data as { message: string };
+}
+
+export async function auditGetMetrics(days = 30) {
+  const res = await api.get('/audit/metrics', { params: { days } });
+  return res.data as AuditMetrics;
 }

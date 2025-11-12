@@ -169,11 +169,18 @@ export default function AdminUsers() {
                     <TableCell>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography fontWeight={600}>{u.username}</Typography>
-                        {u.last_login ? (
-                          <Chip size="small" color="success" label="Activo" />
-                        ) : (
-                          <Chip size="small" variant="outlined" label="Nuevo" />
-                        )}
+                        <Chip
+                          size="small"
+                          color={(u.status === 'Activo'
+                            ? 'success'
+                            : u.status === 'Pausa'
+                            ? 'warning'
+                            : u.status === 'Suspendido'
+                            ? 'error'
+                            : 'default') as any}
+                          variant={u.status === 'Activo' ? 'filled' : 'outlined'}
+                          label={u.status || 'Activo'}
+                        />
                       </Stack>
                       <Typography variant="caption" color="text.secondary">
                         Creado: {new Date(u.created_at).toLocaleString()}
