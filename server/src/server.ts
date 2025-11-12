@@ -183,16 +183,26 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     );
     const user_id = (userResult as ResultSetHeader).insertId;
  
-    // Insert energy card only if a non-empty card_number was provided
-    if (card_number && card_number.trim() !== '') {
-      await conn.execute(
-        'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
-        [user_id, card_number]
-      );
+    // Insert energy card only if a non-empty normalized `card` was provided
+    if (card) {
+      try {
+        await conn.execute(
+          'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
+          [user_id, card]
+        );
+      } catch (e: any) {
+        // Handle race where another transaction inserted the same card concurrently
+        if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+          await conn.rollback();
+          await logSecurity('register_duplicate_card', username, ip, { card_number: card, error: e?.message });
+          return res.status(400).json({ error: 'Card number already exists' });
+        }
+        throw e;
+      }
     }
   
     // Mark employee code as used (if applicable) and record usage in mapping table
-    if (employee_code && employee_code.trim() !== '' && employeeCodeId != null) {
+    if (empCode && employeeCodeId != null) {
       // Record the usage by inserting into employee_code_usages (this references users and employee_codes)
       const [usageResult] = await conn.execute<ResultSetHeader>(
         'INSERT INTO employee_code_usages (employee_code_id, user_id) VALUES (?, ?)',
@@ -208,7 +218,7 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     }
 
     await conn.commit();
-    await logSecurity('register_success', username, ip, { user_id, card_number, role_id });
+    await logSecurity('register_success', username, ip, { user_id, card_number: card, role_id });
     res.json({ message: 'Registration successful' });
   } catch (e: any) {
     try {

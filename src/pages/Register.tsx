@@ -54,13 +54,19 @@ export default function Register() {
 
     setSubmitting(true);
     try {
-      const res = await registerUser({
+      // Build payload conditionally: omit card_number when registering with an employee code
+      const payload: any = {
         username,
         password,
         email,
-        card_number: cardNumber,
-        employee_code: hasEmployeeCode ? employeeCode.trim() : undefined,
-      });
+      };
+      if (!hasEmployeeCode) {
+        payload.card_number = cardNumber;
+      } else {
+        payload.employee_code = employeeCode.trim();
+      }
+
+      const res = await registerUser(payload);
       if ((res as any)?.error) {
         throw new Error((res as any).error);
       }
