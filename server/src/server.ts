@@ -1,4 +1,17 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables from multiple possible locations to work on Linux/Windows and dev/prod
+const envPaths = [
+  process.cwd() + '/.env',
+  process.cwd() + '/.env.linux',
+  path.resolve(__dirname, '../.env'),
+  path.resolve(__dirname, '../.env.linux'),
+  path.resolve(__dirname, '.env'),
+];
+for (const p of envPaths) {
+  try { dotenv.config({ path: p, override: false }); } catch { /* ignore */ }
+}
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -22,6 +35,30 @@ const pool: Pool = createPool({
   connectionLimit: 10,
   queueLimit: 0,
 });
+
+// Test DB connection on startup and log a clear status (non-fatal in dev)
+async function testDbConnection() {
+  try {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query('SELECT 1');
+      console.log(
+        `Database connection OK to ${process.env.DB_HOST || 'localhost'}:${Number(process.env.DB_PORT || 3306)} as ${process.env.DB_USER || 'root'} db ${process.env.DB_NAME || 'ener-go'}`
+      );
+    } finally {
+      conn.release();
+    }
+  } catch (e: any) {
+    console.error('Database connection FAILED', {
+      host: process.env.DB_HOST || 'localhost',
+      port: Number(process.env.DB_PORT || 3306),
+      user: process.env.DB_USER || 'root',
+      database: process.env.DB_NAME || 'ener-go',
+      error: e?.message,
+    });
+  }
+}
+void testDbConnection();
 
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json({
