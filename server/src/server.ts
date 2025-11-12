@@ -101,10 +101,16 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
   const { username, password, email, card_number, employee_code } = req.body as {
     username?: string; password?: string; email?: string; card_number?: string; employee_code?: string;
   };
-  // Require username, password, email and either a card_number or a non-empty employee_code
-  if (!username || !password || !email || (!card_number && !(employee_code && employee_code.trim() !== ''))) {
+
+  // Normalize inputs: trim strings and treat empty strings as null
+  const card = (typeof card_number === 'string' && card_number.trim() !== '') ? card_number.trim() : null;
+  const empCode = (typeof employee_code === 'string' && employee_code.trim() !== '') ? employee_code.trim() : null;
+
+  // Require username, password, email and either a card or a non-empty employee code
+  if (!username || !password || !email || (!card && !empCode)) {
     return res.status(400).json({ error: 'All fields are required' });
   }
+
   const ip = clientIp(req);
   const conn = await pool.getConnection();
   try {
@@ -123,14 +129,14 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     }
 
     // If a card number was provided, check for duplicates
-    if (card_number && card_number.trim() !== '') {
+    if (card) {
       const [cardRows] = await conn.execute<RowDataPacket[]>(
         'SELECT id FROM energy_cards WHERE card_number = ? LIMIT 1',
-        [card_number]
+        [card]
       );
       if (cardRows.length > 0) {
         await conn.rollback();
-        await logSecurity('register_duplicate_card', username, ip, { card_number });
+        await logSecurity('register_duplicate_card', username, ip, { card_number: card });
         return res.status(400).json({ error: 'Card number already exists' });
       }
     }
@@ -138,21 +144,21 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     // Determine role_id: default to 'user', or use employee_code to set admin/audit
     let role_id: number | null = null;
     let employeeCodeId: number | null = null;
-    if (employee_code && employee_code.trim() !== '') {
+    if (empCode) {
       // Lock the employee_codes row so two requests can't use the same code concurrently
       const [codeRows] = await conn.execute<RowDataPacket[]>(
         'SELECT id, role_id, used FROM employee_codes WHERE code = ? LIMIT 1 FOR UPDATE',
-        [employee_code.trim()]
+        [empCode]
       );
       if ((codeRows as any[]).length === 0) {
         await conn.rollback();
-        await logSecurity('register_bad_code', username, ip, { employee_code });
+        await logSecurity('register_bad_code', username, ip, { employee_code: empCode });
         return res.status(400).json({ error: 'Invalid employee code' });
       }
       const codeRow = (codeRows as any[])[0];
       if (Number(codeRow.used) === 1) {
         await conn.rollback();
-        await logSecurity('register_code_used', username, ip, { employee_code });
+        await logSecurity('register_code_used', username, ip, { employee_code: empCode });
         return res.status(400).json({ error: 'Employee code already used' });
       }
       role_id = Number(codeRow.role_id);
