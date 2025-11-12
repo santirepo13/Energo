@@ -23,7 +23,14 @@ export type RechargeRequest = {
   kwh?: number;
 };
 
+export type UserInfo = {
+  username: string;
+  role: string | null;
+  status: string | null;
+};
+
 export type DashboardResponse = {
+  current_user?: UserInfo;
   card: {
     card_number: string;
     current_balance: number;
@@ -73,4 +80,37 @@ export async function recharge(data: RechargeRequest) {
 export async function health() {
   const res = await api.get('/health');
   return res.data as { status: string };
+}
+
+export type AdminUserRow = {
+  id: number;
+  username: string;
+  email: string;
+  created_at: string;
+  last_login: string | null;
+  role: string | null;
+  status: string | null;
+};
+
+export async function adminListUsers() {
+  const res = await api.get('/admin/users');
+  return res.data as { users: AdminUserRow[] };
+}
+
+export async function adminUpdateEmail(id: number, email: string) {
+  const res = await api.patch(`/admin/users/${id}/email`, { email });
+  return res.data as { message: string };
+}
+
+export async function adminUpdateStatus(
+  id: number,
+  status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
+) {
+  const res = await api.patch(`/admin/users/${id}/status`, { status });
+  return res.data as { message: string };
+}
+
+export async function adminSendReset(id: number) {
+  const res = await api.post(`/admin/users/${id}/send-reset`);
+  return res.data as { message: string; link: string };
 }

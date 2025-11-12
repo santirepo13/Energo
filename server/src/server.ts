@@ -176,10 +176,21 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
       role_id = Number((roleRows as any[])[0].id);
     }
 
+    // Resolve default status 'Activo'
+    const [statusRows] = await conn.execute<RowDataPacket[]>(
+      "SELECT id FROM statuses WHERE name = 'Activo' LIMIT 1"
+    );
+    if ((statusRows as any[]).length === 0) {
+      await conn.rollback();
+      console.error('Missing default status "Activo" in statuses table');
+      return res.status(500).json({ error: 'Server misconfiguration' });
+    }
+    const status_id = Number((statusRows as any[])[0].id);
+
     const password_hash = await bcrypt.hash(password, 10);
     const [userResult] = await conn.execute<ResultSetHeader>(
-      'INSERT INTO users (username, password_hash, email, role_id) VALUES (?, ?, ?, ?)',
-      [username, password_hash, email, role_id]
+      'INSERT INTO users (username, password_hash, email, role_id, status_id) VALUES (?, ?, ?, ?, ?)',
+      [username, password_hash, email, role_id, status_id]
     );
     const user_id = (userResult as ResultSetHeader).insertId;
  
@@ -241,7 +252,12 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
   const conn = await pool.getConnection();
   try {
     const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id, password_hash FROM users WHERE username = ? LIMIT 1',
+      `SELECT u.id, u.password_hash, r.name AS role_name, s.name AS status_name
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE u.username = ?
+       LIMIT 1`,
       [username]
     );
     if (rows.length === 0) {
@@ -254,10 +270,20 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
       await logSecurity('login_failed', username, ip, { reason: 'bad_password' });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Enforce status: block Deshabilitado and Suspendido
+    const statusName = (user.status_name || '').toString();
+    if (statusName === 'Deshabilitado' || statusName === 'Suspendido') {
+      await logSecurity('login_blocked_status', username, ip, { status: statusName });
+      return res.status(403).json({ error: `Cuenta ${statusName}. Contacte al administrador.` });
+    }
+
     (req.session as any).userId = user.id;
     (req.session as any).username = username;
+    (req.session as any).role = user.role_name || null;
+    (req.session as any).status = statusName || null;
     await conn.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
-    await logSecurity('login_success', username, ip, {});
+    await logSecurity('login_success', username, ip, { role: user.role_name, status: statusName });
     res.json({ message: 'Login successful' });
   } catch (e: any) {
     console.error(e);
@@ -268,11 +294,58 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
   }
 });
 
+async function getUserRoleAndStatus(userId: number): Promise<{ role: string | null; status: string | null } | null> {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT r.name AS role_name, s.name AS status_name
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [userId]
+    );
+    if ((rows as any[]).length === 0) return null;
+    const r = rows[0] as any;
+    return { role: (r.role_name ?? null), status: (r.status_name ?? null) };
+  } finally {
+    conn.release();
+  }
+}
+
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!(req.session as any)?.userId) {
+  const userId = (req.session as any)?.userId as number | undefined;
+  if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  next();
+  // Also enforce user status on each request in case it changed after login
+  getUserRoleAndStatus(userId)
+    .then((info) => {
+      const status = info?.status || null;
+      if (status === 'Deshabilitado' || status === 'Suspendido') {
+        return res.status(403).json({ error: `Cuenta ${status}. Contacte al administrador.` });
+      }
+      return next();
+    })
+    .catch((_e) => {
+      return res.status(500).json({ error: 'Auth check failed' });
+    });
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const userId = (req.session as any)?.userId as number | undefined;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  getUserRoleAndStatus(userId)
+    .then((info) => {
+      if (!info || info.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin only' });
+      }
+      next();
+    })
+    .catch((_e) => res.status(500).json({ error: 'Authorization check failed' }));
 }
 
 app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express.Response) => {
@@ -293,8 +366,24 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
       'SELECT event_type, event_time, ip_address, details FROM security_logs WHERE username = ? ORDER BY event_time DESC LIMIT 100',
       [username]
     );
+    const [infoRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT u.username, r.name AS role_name, s.name AS status_name
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [userId]
+    );
+    const info = (infoRows as any[])[0] || { username, role_name: null, status_name: null };
     const costPerKwh = await getCostPerKwh(conn);
-    res.json({ card, recharge_history: pins, security_logs: logs, cost_per_kwh: costPerKwh });
+    res.json({
+      current_user: { username: info.username, role: info.role_name, status: info.status_name },
+      card,
+      recharge_history: pins,
+      security_logs: logs,
+      cost_per_kwh: costPerKwh
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load dashboard' });
@@ -322,6 +411,20 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
   }
   const conn = await pool.getConnection();
   try {
+    // Check status; block when in Pausa/Deshabilitado/Suspendido for recharges
+    const [statusRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT s.name AS status_name
+       FROM users u
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [userId]
+    );
+    const statusName = (statusRows as any[])[0]?.status_name as string | undefined;
+    if (statusName === 'Pausa' || statusName === 'Deshabilitado' || statusName === 'Suspendido') {
+      return res.status(403).json({ error: `No puede recargar mientras la cuenta está en "${statusName}".` });
+    }
+
     const costPerKwh = await getCostPerKwh(conn);
     let amountCOP: number;
     let kwhVal: number;
@@ -362,10 +465,116 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
       current_kwh: newKwh
     });
   } catch (e: any) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch {}
     console.error(e);
     await logSecurity('recharge_error', username, ip, { error: e?.message });
     res.status(500).json({ error: 'Recharge failed' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Session logout
+app.post('/api/logout', requireAuth, async (req: express.Request, res: express.Response) => {
+  const username = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
+  (req.session as any).destroy(async () => {
+    await logSecurity('logout', username, ip, {});
+    res.json({ message: 'Logged out' });
+  });
+});
+
+// Admin: list users
+app.get('/api/admin/users', requireAuth, requireAdmin, async (_req: express.Request, res: express.Response) => {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT u.id, u.username, u.email, u.created_at, u.last_login,
+              r.name AS role, s.name AS status
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       LEFT JOIN statuses s ON s.id = u.status_id
+       ORDER BY u.created_at DESC`
+    );
+    res.json({ users: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list users' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Admin: update user email
+app.patch('/api/admin/users/:id/email', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  const { email } = req.body as { email?: string };
+  if (!id || !email) return res.status(400).json({ error: 'Invalid request' });
+  const conn = await pool.getConnection();
+  try {
+    // ensure not taken
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+      [email, id]
+    );
+    if ((rows as any[]).length > 0) return res.status(400).json({ error: 'Email already in use' });
+    await conn.execute('UPDATE users SET email = ? WHERE id = ?', [email, id]);
+    res.json({ message: 'Email updated' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update email' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Admin: update user status
+app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  const { status } = req.body as { status?: string };
+  if (!id || !status) return res.status(400).json({ error: 'Invalid request' });
+  const conn = await pool.getConnection();
+  try {
+    // validate allowed statuses
+    const allowed = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const [srows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
+      [status]
+    );
+    if ((srows as any[]).length === 0) return res.status(400).json({ error: 'Status not found' });
+    const statusId = Number((srows as any[])[0].id);
+    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [statusId, id]);
+    res.json({ message: 'Status updated' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update status' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Admin: mock send reset password link
+app.post('/api/admin/users/:id/send-reset', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid user id' });
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT username, email FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
+    const u = (rows as any[])[0] as any;
+    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const resetLink = `${CLIENT_ORIGIN}/reset-password?token=${token}`;
+    await logSecurity('password_reset_link', u.username, clientIp(req), { user_id: id, email: u.email, reset_link: resetLink });
+    res.json({ message: 'Password reset link queued (mock)', link: resetLink });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to send reset link' });
   } finally {
     conn.release();
   }

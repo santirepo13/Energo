@@ -59,6 +59,8 @@ export default function Dashboard() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const cost = data?.cost_per_kwh ?? 900;
+  const userStatus = data?.current_user?.status ?? null;
+  const isPaused = userStatus === 'Pausa';
 
   useEffect(() => {
     let mounted = true;
@@ -175,7 +177,20 @@ export default function Dashboard() {
           icon={<BoltIcon />}
           sx={{ ml: 1 }}
         />
+        {userStatus && (
+          <Chip
+            color={userStatus === 'Activo' ? 'success' : userStatus === 'Pausa' ? 'warning' : 'default'}
+            label={`Estado: ${userStatus}`}
+            sx={{ ml: 1 }}
+          />
+        )}
       </Stack>
+
+      {isPaused && (
+        <Alert severity="warning">
+          Su cuenta está en Pausa. Las recargas están deshabilitadas temporalmente.
+        </Alert>
+      )}
 
       {!card && <Alert severity="warning">No se encontró tarjeta de energía asociada al usuario.</Alert>}
 
@@ -242,6 +257,7 @@ export default function Dashboard() {
                     startAdornment: <InputAdornment position="start">$</InputAdornment>,
                   }}
                   helperText={equivalent || `Costo actual: ${formatCOP(cost)} por kWh`}
+                  disabled={submitting || isPaused}
                   required
                   fullWidth
                 />
@@ -256,13 +272,14 @@ export default function Dashboard() {
                   placeholder="10"
                   inputProps={{ inputMode: 'decimal' }}
                   helperText={equivalent || `Costo actual: ${formatCOP(cost)} por kWh`}
+                  disabled={submitting || isPaused}
                   required
                   fullWidth
                 />
               )}
 
               <Stack direction="row" spacing={2}>
-                <Button type="submit" variant="contained" disabled={submitting}>
+                <Button type="submit" variant="contained" disabled={submitting || isPaused}>
                   {submitting ? 'Procesando…' : 'Generar PIN y recargar'}
                 </Button>
               </Stack>

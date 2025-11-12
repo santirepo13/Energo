@@ -2,24 +2,33 @@ import { Routes, Route, Link } from 'react-router-dom'
 import { AppBar, Toolbar, Typography, Button, Container, Box } from '@mui/material'
 import './App.css'
 import logo from './assets/logo.png'
-import LoginPage from './pages/Login'
-import RegisterPage from './pages/Register'
-import DashboardPage from './pages/Dashboard'
+import LoginPage from './pages/Login.tsx'
+import RegisterPage from './pages/Register.tsx'
+import DashboardPage from './pages/Dashboard.tsx'
+import AdminUsersPage from './pages/AdminUsers.tsx'
 import { useEffect, useState } from 'react'
 import { getDashboard, api } from './api/client'
+import type { UserInfo } from './api/client'
 
 function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
+  const [currentUser, setCurrentUser] = useState<UserInfo | null>(null)
 
   useEffect(() => {
     let mounted = true
 
     const checkAuth = async () => {
       try {
-        await getDashboard()
-        if (mounted) setAuthenticated(true)
+        const d = await getDashboard()
+        if (mounted) {
+          setAuthenticated(true)
+          setCurrentUser(d.current_user ?? null)
+        }
       } catch (e) {
-        if (mounted) setAuthenticated(false)
+        if (mounted) {
+          setAuthenticated(false)
+          setCurrentUser(null)
+        }
       }
     }
 
@@ -45,6 +54,7 @@ function App() {
       // ignore errors
     } finally {
       setAuthenticated(false)
+      setCurrentUser(null)
       window.location.href = '/login'
     }
   }
@@ -65,7 +75,12 @@ function App() {
             </>
           )}
           {authenticated === true && (
-            <Button color="inherit" onClick={handleLogout}>Cerrar sesión</Button>
+            <>
+              {currentUser?.role === 'admin' && (
+                <Button color="inherit" component={Link} to="/admin/users">Usuarios</Button>
+              )}
+              <Button color="inherit" onClick={handleLogout}>Cerrar sesión</Button>
+            </>
           )}
         </Toolbar>
       </AppBar>
@@ -76,6 +91,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
         </Routes>
       </Container>
     </>
