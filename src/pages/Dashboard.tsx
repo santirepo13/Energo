@@ -282,7 +282,7 @@ export default function Dashboard() {
             </ButtonBase>
             <Dialog open={kwhDialogOpen} onClose={() => setKwhDialogOpen(false)} PaperProps={{ sx: { bgcolor: '#fff' } }}>
               <DialogTitle>Actualizar precio por kWh</DialogTitle>
-              <DialogContent>
+              <DialogContent sx={{ pt: 2 }}>
                 <TextField
                   label="Precio (COP)"
                   value={kwhDialogPrice}
@@ -292,8 +292,8 @@ export default function Dashboard() {
                   }}
                   placeholder="861.88"
                   variant="outlined"
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                  InputLabelProps={{ shrink: true, sx: { backgroundColor: '#fff', px: 0.5 } }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment>, notched: true }}
                   inputProps={{ inputMode: 'decimal' }}
                   fullWidth
                   autoFocus
