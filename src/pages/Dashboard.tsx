@@ -380,7 +380,7 @@ export default function Dashboard() {
           <Stack spacing={2}>
             {auditError && <Alert severity="error">{auditError}</Alert>}
 
-            <Paper sx={{ p: 2, bgcolor: '#000', color: '#fff' }}>
+            <Paper sx={{ p: 2, bgcolor: '#ffffff', color: '#111' }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <SecurityIcon sx={{ color: '#90caf9' }} />
                 <Typography variant="h6" color="inherit">Métricas de Ventas (todas)</Typography>
@@ -390,13 +390,13 @@ export default function Dashboard() {
               ) : (
                 <Stack spacing={2}>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
-                    <Chip label={`Códigos vendidos: ${auditMetrics.totals.codes_sold}`} sx={{ bgcolor: '#111', color: '#fff' }} />
-                    <Chip label={`kWh vendidos: ${Number(auditMetrics.totals.kwh).toFixed(2)}`} sx={{ bgcolor: '#111', color: '#fff' }} />
-                    <Chip label={`Monto (COP): ${formatCOP(Number(auditMetrics.totals.amount_cop))}`} sx={{ bgcolor: '#111', color: '#fff' }} />
+                    <Chip label={`Códigos vendidos: ${auditMetrics.totals.codes_sold}`} sx={{ bgcolor: '#ffffff', color: '#111', border: '1px solid rgba(0,0,0,0.08)' }} />
+                    <Chip label={`kWh vendidos: ${Number(auditMetrics.totals.kwh).toFixed(2)}`} sx={{ bgcolor: '#ffffff', color: '#111', border: '1px solid rgba(0,0,0,0.08)' }} />
+                    <Chip label={`Monto (COP): ${formatCOP(Number(auditMetrics.totals.amount_cop))}`} sx={{ bgcolor: '#ffffff', color: '#111', border: '1px solid rgba(0,0,0,0.08)' }} />
                   </Stack>
-                  <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(255,255,255,0.12)', color: 'inherit' } }}>
+                  <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(0,0,0,0.12)', color: 'inherit' } }}>
                     <TableHead>
-                      <TableRow sx={{ bgcolor: 'rgba(255,255,255,0.06)' }}>
+                      <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
                         <TableCell>Día</TableCell>
                         <TableCell align="right">Códigos</TableCell>
                         <TableCell align="right">kWh</TableCell>
@@ -423,14 +423,14 @@ export default function Dashboard() {
               )}
             </Paper>
 
-            <Paper sx={{ p: 2, bgcolor: '#000', color: '#fff' }}>
+            <Paper sx={{ p: 2, bgcolor: '#ffffff', color: '#111' }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <SecurityIcon sx={{ color: '#90caf9' }} />
                 <Typography variant="h6" color="inherit">Registros de Seguridad (todos los usuarios)</Typography>
               </Stack>
-              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(255,255,255,0.12)', color: 'inherit' } }}>
+              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(0,0,0,0.12)', color: 'inherit' } }}>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: 'rgba(255,255,255,0.06)' }}>
+                  <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
                     <TableCell>Fecha</TableCell>
                     <TableCell>Evento</TableCell>
                     <TableCell>IP</TableCell>
@@ -459,14 +459,14 @@ export default function Dashboard() {
               </Table>
             </Paper>
 
-            <Paper sx={{ p: 2, bgcolor: '#000', color: '#fff' }}>
+            <Paper sx={{ p: 2, bgcolor: '#ffffff', color: '#111' }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <SecurityIcon sx={{ color: '#90caf9' }} />
                 <Typography variant="h6" color="inherit">Administradores - Cambiar estado</Typography>
               </Stack>
-              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(255,255,255,0.12)', color: 'inherit' } }}>
+              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(0,0,0,0.12)', color: 'inherit' } }}>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: 'rgba(255,255,255,0.06)' }}>
+                  <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
                     <TableCell>Usuario</TableCell>
                     <TableCell>Correo</TableCell>
                     <TableCell>Estado</TableCell>
