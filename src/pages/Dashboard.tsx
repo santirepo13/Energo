@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   Card,
   CardContent,
   CircularProgress,
@@ -209,6 +210,11 @@ export default function Dashboard() {
     }
   }
 
+  function handleOpenKwhDialog() {
+    setKwhDialogPrice(String(cost));
+    setKwhDialogOpen(true);
+  }
+
   // Save kWh price (admin)
   async function handleSaveKwhPrice() {
     setKwhDialogError(null);
@@ -257,17 +263,28 @@ export default function Dashboard() {
         </Typography>
         {isAdmin ? (
           <>
-            <Chip
-              color="success"
-              clickable
-              label={`Costo: ${formatCOPCost(cost)} por kWh`}
-              icon={<BoltIcon />}
-              onClick={() => {
-                setKwhDialogPrice(String(cost));
-                setKwhDialogOpen(true);
-              }}
-              sx={{ ml: 1, cursor: 'pointer' }}
-            />
+            <ButtonBase
+              onClick={handleOpenKwhDialog}
+              aria-label="Actualizar costo por kWh"
+              sx={{ ml: 1, borderRadius: '16px', display: 'inline-flex' }}
+            >
+              <Chip
+                color="success"
+                clickable
+                component="button"
+                label={`Costo: ${formatCOPCost(cost)} por kWh`}
+                icon={<BoltIcon />}
+                sx={{ pointerEvents: 'none' }}
+              />
+            </ButtonBase>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleOpenKwhDialog}
+              sx={{ ml: 1 }}
+            >
+              Editar
+            </Button>
             <Dialog open={kwhDialogOpen} onClose={() => setKwhDialogOpen(false)}>
               <DialogTitle>Actualizar precio por kWh</DialogTitle>
               <DialogContent>
