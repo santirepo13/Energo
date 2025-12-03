@@ -292,11 +292,15 @@ export default function Dashboard() {
                   }}
                   placeholder="861.88"
                   variant="outlined"
-                  InputLabelProps={{ shrink: true, sx: { backgroundColor: '#fff', px: 0.5 } }}
-                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment>, notched: true }}
-                  inputProps={{ inputMode: 'decimal' }}
                   fullWidth
                   autoFocus
+                  InputLabelProps={{ shrink: true, sx: { bgcolor: '#fff', px: 0.5, zIndex: 1 } }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment>, notched: false }}
+                  inputProps={{ inputMode: 'decimal' }}
+                  sx={{
+                    bgcolor: '#fff',
+                    '& .MuiOutlinedInput-notchedOutline legend': { maxWidth: 0 }
+                  }}
                 />
                 {kwhDialogError && <Alert severity="error" sx={{ mt: 1 }}>{kwhDialogError}</Alert>}
               </DialogContent>
