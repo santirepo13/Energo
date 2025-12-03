@@ -6,6 +6,7 @@ import LoginPage from './pages/Login.tsx'
 import RegisterPage from './pages/Register.tsx'
 import DashboardPage from './pages/Dashboard.tsx'
 import AdminUsersPage from './pages/AdminUsers.tsx'
+import AuditEmployeesPage from './pages/AuditEmployees.tsx'
 import { useEffect, useState, useMemo } from 'react'
 import { getDashboard, api } from './api/client'
 import type { UserInfo } from './api/client'
@@ -93,6 +94,9 @@ function App() {
               {currentUser?.role === 'admin' && (
                 <Button color="inherit" component={Link} to="/admin/users">Usuarios</Button>
               )}
+              {currentUser?.role === 'audit' && (
+                <Button color="inherit" component={Link} to="/audit/employees">Registro empleados</Button>
+              )}
               <Button color="inherit" onClick={handleLogout}>Cerrar sesión</Button>
             </>
           )}
@@ -106,6 +110,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/audit/employees" element={<AuditEmployeesPage />} />
         </Routes>
       </Container>
     </ThemeProvider>

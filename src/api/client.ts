@@ -155,3 +155,30 @@ export async function adminUpdateKwhPrice(price: number) {
   const res = await api.post('/admin/kwh-price', { price });
   return res.data as { message: string; cost_per_kwh: number };
 }
+
+
+// ==== Audit Employees (admin + audit) and Employee Codes API ====
+
+export type EmployeeCodeRow = {
+  id: number;
+  code: string;
+  role: string | null;
+  used: number | boolean;
+  created_at: string;
+  used_at: string | null;
+};
+
+export async function auditListEmployees() {
+  const res = await api.get('/audit/employees');
+  return res.data as { users: AdminUserRow[] };
+}
+
+export async function auditListEmployeeCodes() {
+  const res = await api.get('/audit/employee-codes');
+  return res.data as { codes: EmployeeCodeRow[] };
+}
+
+export async function auditGenerateEmployeeCode(role: 'admin' | 'audit') {
+  const res = await api.post('/audit/employee-codes', { role });
+  return res.data as { id: number; code: string; role: 'admin' | 'audit' };
+}

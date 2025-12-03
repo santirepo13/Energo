@@ -471,21 +471,43 @@ app.get('/api/audit/admins', requireAuth, requireAudit, async (_req: express.Req
   }
 });
 
-// Audit: update admin status
+// Audit: list employees (admin + audit)
+app.get('/api/audit/employees', requireAuth, requireAudit, async (_req: express.Request, res: express.Response) => {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT u.id, u.username, u.email, u.created_at, u.last_login,
+              r.name AS role, s.name AS status
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE r.name IN ('admin','audit')
+       ORDER BY u.created_at DESC`
+    );
+    res.json({ users: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list employees' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Audit: update employee status (admin + audit)
 app.patch('/api/audit/users/:id/status', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
   const id = Number(req.params.id);
   const { status } = req.body as { status?: string };
   if (!id || !status) return res.status(400).json({ error: 'Invalid request' });
   const conn = await pool.getConnection();
   try {
-    // Ensure target user is admin
+    // Ensure target user is admin or audit
     const [roleRows] = await conn.execute<RowDataPacket[]>(
       'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
       [id]
     );
     if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
     const targetRole = ((roleRows as any[])[0] as any).role as string | null;
-    if (targetRole !== 'admin') return res.status(403).json({ error: 'Can only modify admin users' });
+    if (targetRole !== 'admin' && targetRole !== 'audit') return res.status(403).json({ error: 'Can only modify admin/audit users' });
 
     // validate allowed statuses
     const allowed = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
@@ -547,6 +569,77 @@ app.get('/api/audit/metrics', requireAuth, requireAudit, async (req: express.Req
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load metrics' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Audit: list employee codes
+app.get('/api/audit/employee-codes', requireAuth, requireAudit, async (_req: express.Request, res: express.Response) => {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT ec.id, ec.code, ec.used, ec.created_at, ec.used_at, r.name AS role
+       FROM employee_codes ec
+       LEFT JOIN roles r ON r.id = ec.role_id
+       ORDER BY ec.created_at DESC`
+    );
+    res.json({ codes: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list employee codes' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Audit: generate new employee code (for admin/audit roles)
+app.post('/api/audit/employee-codes', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
+  const { role } = req.body as { role?: string };
+  const ip = clientIp(req);
+  const roleName = (role || '').toString().toLowerCase();
+  if (roleName !== 'admin' && roleName !== 'audit') {
+    return res.status(400).json({ error: 'Role must be "admin" or "audit"' });
+  }
+  const conn = await pool.getConnection();
+  try {
+    // Resolve role_id
+    const [rrows] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM roles WHERE name = ? LIMIT 1`,
+      [roleName]
+    );
+    if ((rrows as any[]).length === 0) return res.status(400).json({ error: 'Role not found' });
+    const roleId = Number((rrows as any[])[0].id);
+
+    let code = '';
+    let attempts = 0;
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const prefix = roleName === 'admin' ? 'ADMIN' : 'AUDIT';
+    while (attempts < 5) {
+      const rand = Array.from({ length: 8 })
+        .map(() => alphabet.charAt(Math.floor(Math.random() * alphabet.length)))
+        .join('');
+      code = `${prefix}-${rand}`;
+      try {
+        const [ins] = await conn.execute<ResultSetHeader>(
+          'INSERT INTO employee_codes (code, role_id, used) VALUES (?, ?, 0)',
+          [code, roleId]
+        );
+        const id = (ins as ResultSetHeader).insertId;
+        await logSecurity('employee_code_generated', (req.session as any)?.username ?? null, ip, { code, role: roleName });
+        return res.json({ id, code, role: roleName });
+      } catch (e: any) {
+        if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+          attempts++;
+          continue;
+        }
+        throw e;
+      }
+    }
+    return res.status(500).json({ error: 'Failed to generate unique code' });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to generate code' });
   } finally {
     conn.release();
   }

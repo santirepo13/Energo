@@ -24,8 +24,6 @@ import {
   Typography,
   InputAdornment,
   Chip,
-  Select,
-  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -36,8 +34,8 @@ import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
 import logo from '../assets/logo.png';
-import type { DashboardResponse, AuditMetrics, AdminUserRow } from '../api/client';
-import { getDashboard, recharge, auditListAdmins, auditUpdateStatus, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
+import type { DashboardResponse, AuditMetrics } from '../api/client';
+import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
 
 const currencyCOP = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -88,36 +86,20 @@ export default function Dashboard() {
   const showHistory = !isAudit; // admin + regular users
   const showLogs = isAudit;     // only auditors
 
-  const STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
 
   // Audit state
   const [auditMetrics, setAuditMetrics] = useState<AuditMetrics | null>(null);
-  const [auditAdmins, setAuditAdmins] = useState<AdminUserRow[]>([]);
-  const [auditSaving, setAuditSaving] = useState<Record<number, boolean>>({});
   const [auditError, setAuditError] = useState<string | null>(null);
 
   async function loadAuditData() {
     try {
-      const [m, a] = await Promise.all([auditGetMetrics(30), auditListAdmins()]);
+      const m = await auditGetMetrics(30);
       setAuditMetrics(m);
-      setAuditAdmins(a.users);
     } catch (e: any) {
-      setAuditError(e?.response?.data?.error || e?.message || 'Error al cargar métricas/administradores');
+      setAuditError(e?.response?.data?.error || e?.message || 'Error al cargar métricas');
     }
   }
 
-  async function handleAuditChangeStatus(userId: number, status: typeof STATUS_OPTIONS[number]) {
-    setAuditSaving((prev) => ({ ...prev, [userId]: true }));
-    setAuditError(null);
-    try {
-      await auditUpdateStatus(userId, status);
-      setAuditAdmins((prev) => prev.map((u) => (u.id === userId ? { ...u, status } : u)));
-    } catch (e: any) {
-      setAuditError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el estado');
-    } finally {
-      setAuditSaving((prev) => ({ ...prev, [userId]: false }));
-    }
-  }
 
   useEffect(() => {
     let mounted = true;
@@ -563,59 +545,6 @@ export default function Dashboard() {
               </Table>
             </Paper>
 
-            <Paper sx={{ p: 2, bgcolor: '#ffffff', color: '#111' }}>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <SecurityIcon sx={{ color: '#90caf9' }} />
-                <Typography variant="h6" color="inherit">Administradores - Cambiar estado</Typography>
-              </Stack>
-              <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(0,0,0,0.12)', color: 'inherit' } }}>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
-                    <TableCell>Usuario</TableCell>
-                    <TableCell>Correo</TableCell>
-                    <TableCell>Estado</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(auditAdmins ?? []).map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography fontWeight={600} color="inherit">{u.username}</Typography>
-                        </Stack>
-                      </TableCell>
-                      <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {u.email ?? '—'}
-                      </TableCell>
-                      <TableCell width={220}>
-                        <Select
-                          size="small"
-                          fullWidth
-                          value={u.status || 'Activo'}
-                          onChange={(e) => handleAuditChangeStatus(u.id, (e.target.value as any))}
-                          disabled={!!auditSaving[u.id]}
-                          sx={{
-                            color: 'inherit',
-                            '& .MuiSelect-icon': { color: 'inherit' },
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.23)' },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
-                          }}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <MenuItem key={s} value={s}>{s}</MenuItem>
-                          ))}
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {auditAdmins.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center">Sin administradores.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </Paper>
           </Stack>
         )}
       </Box>
