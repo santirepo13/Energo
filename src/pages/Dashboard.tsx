@@ -264,9 +264,12 @@ export default function Dashboard() {
         {isAdmin ? (
           <>
             <ButtonBase
+              component="button"
+              disableRipple
+              focusRipple={false}
               onClick={handleOpenKwhDialog}
               aria-label="Actualizar costo por kWh"
-              sx={{ ml: 1, borderRadius: '16px', display: 'inline-flex' }}
+              sx={{ ml: 1, borderRadius: '16px', display: 'inline-flex', lineHeight: 1 }}
             >
               <Chip
                 color="success"
@@ -277,15 +280,7 @@ export default function Dashboard() {
                 sx={{ pointerEvents: 'none' }}
               />
             </ButtonBase>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleOpenKwhDialog}
-              sx={{ ml: 1 }}
-            >
-              Editar
-            </Button>
-            <Dialog open={kwhDialogOpen} onClose={() => setKwhDialogOpen(false)}>
+            <Dialog open={kwhDialogOpen} onClose={() => setKwhDialogOpen(false)} PaperProps={{ sx: { bgcolor: '#fff' } }}>
               <DialogTitle>Actualizar precio por kWh</DialogTitle>
               <DialogContent>
                 <TextField
@@ -296,8 +291,12 @@ export default function Dashboard() {
                     setKwhDialogPrice(v);
                   }}
                   placeholder="861.88"
+                  variant="outlined"
+                  InputLabelProps={{ shrink: true }}
                   InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                  inputProps={{ inputMode: 'decimal' }}
                   fullWidth
+                  autoFocus
                 />
                 {kwhDialogError && <Alert severity="error" sx={{ mt: 1 }}>{kwhDialogError}</Alert>}
               </DialogContent>
