@@ -357,8 +357,15 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Enforce status: block Deshabilitado and Suspendido
+    // Enforce status rules
     const statusName = (user.status_name || '').toString();
+    const roleName = (user.role_name || '').toString();
+    // Special case: disabled admin should look like a non-existent account
+    if (roleName === 'admin' && statusName === 'Deshabilitado') {
+      await logSecurity('login_blocked_admin_disabled', username, ip, { status: statusName });
+      return res.status(401).json({ error: 'Cuenta no existe' });
+    }
+    // Generic blocks
     if (statusName === 'Deshabilitado' || statusName === 'Suspendido') {
       await logSecurity('login_blocked_status', username, ip, { status: statusName });
       return res.status(403).json({ error: `Cuenta ${statusName}. Contacte al administrador.` });
@@ -509,8 +516,10 @@ app.patch('/api/audit/users/:id/status', requireAuth, requireAudit, async (req: 
     const targetRole = ((roleRows as any[])[0] as any).role as string | null;
     if (targetRole !== 'admin' && targetRole !== 'audit') return res.status(403).json({ error: 'Can only modify admin/audit users' });
 
-    // validate allowed statuses
-    const allowed = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
+    // validate allowed statuses (admins: only Activo/Deshabilitado)
+    const allowed = targetRole === 'admin'
+      ? ['Activo', 'Deshabilitado']
+      : ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
@@ -882,8 +891,10 @@ app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req: 
     const targetRole = ((roleRows as any[])[0] as any).role as string | null;
     if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
 
-    // validate allowed statuses
-    const allowed = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
+    // validate allowed statuses (admins: only Activo/Deshabilitado)
+    const allowed = targetRole === 'admin'
+      ? ['Activo', 'Deshabilitado']
+      : ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }

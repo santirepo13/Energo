@@ -38,7 +38,8 @@ type RowState = {
   sendingReset: boolean;
 };
 
-const STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
+const ALL_STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
+const ADMIN_STATUS_OPTIONS = ['Activo', 'Deshabilitado'] as const;
 
 export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
@@ -99,7 +100,7 @@ export default function AdminUsers() {
     }
   }
 
-  async function handleChangeStatus(u: AdminUserRow, status: typeof STATUS_OPTIONS[number]) {
+  async function handleChangeStatus(u: AdminUserRow, status: typeof ALL_STATUS_OPTIONS[number]) {
     setRow(u.id, (prev) => ({ ...prev, savingStatus: true }));
     setError(null);
     setSuccess(null);
@@ -224,7 +225,7 @@ export default function AdminUsers() {
                         onChange={(e) => handleChangeStatus(u, e.target.value as any)}
                         disabled={st?.savingStatus}
                       >
-                        {STATUS_OPTIONS.map((s) => (
+                        {(u.role?.toLowerCase() === 'admin' ? ADMIN_STATUS_OPTIONS : ALL_STATUS_OPTIONS).map((s) => (
                           <MenuItem key={s} value={s}>{s}</MenuItem>
                         ))}
                       </Select>

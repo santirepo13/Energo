@@ -37,7 +37,7 @@ type EmployeeCodeRow = {
   used_at: string | null;
 };
 
-const STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
+const ADMIN_STATUS_OPTIONS = ['Activo', 'Deshabilitado'] as const;
 
 export default function AuditEmployeesPage() {
   const [loadingEmployees, setLoadingEmployees] = useState(true);
@@ -87,7 +87,7 @@ export default function AuditEmployeesPage() {
     void loadCodes();
   }, []);
 
-  async function handleChangeStatus(userId: number, status: typeof STATUS_OPTIONS[number]) {
+  async function handleChangeStatus(userId: number, status: typeof ADMIN_STATUS_OPTIONS[number]) {
     setSavingStatus((p) => ({ ...p, [userId]: true }));
     setStatusError(null);
     try {
@@ -295,7 +295,7 @@ export default function AuditEmployeesPage() {
                           '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23)' },
                         }}
                       >
-                        {STATUS_OPTIONS.map((s) => (
+                        {ADMIN_STATUS_OPTIONS.map((s) => (
                           <MenuItem key={s} value={s}>{s}</MenuItem>
                         ))}
                       </Select>
