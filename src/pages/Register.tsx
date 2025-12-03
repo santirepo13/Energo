@@ -21,6 +21,47 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import logo from '../assets/logo.png';
 import { registerUser } from '../api/client';
 
+/**
+ * Validates the password to match server policy:
+ * - Min length 12
+ * - At least 3 classes among: lowercase, uppercase, digits, symbols
+ * - No spaces
+ * - Must not contain username or local part of email
+ * Returns null when OK, or a Spanish error message otherwise.
+ */
+function passwordPolicyIssues(password: string, username: string, email: string): string | null {
+  const issues: string[] = [];
+  const pw = String(password ?? '');
+  const uname = String(username ?? '').toLowerCase();
+  const emailLocal = String(email ?? '').toLowerCase().split('@')[0] || '';
+
+  if (pw.length < 12) {
+    issues.push('Debe tener al menos 12 caracteres');
+  }
+  const hasLower = /[a-z]/.test(pw);
+  const hasUpper = /[A-Z]/.test(pw);
+  const hasDigit = /[0-9]/.test(pw);
+  const hasSymbol = /[^A-Za-z0-9]/.test(pw);
+  const classes = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
+  if (classes < 3) {
+    issues.push('Debe incluir al menos 3 de: mayúsculas, minúsculas, dígitos, símbolos');
+  }
+  if (/\s/.test(pw)) {
+    issues.push('No debe contener espacios');
+  }
+  const lowerPw = pw.toLowerCase();
+  if (uname && lowerPw.includes(uname)) {
+    issues.push('No debe contener el nombre de usuario');
+  }
+  if (emailLocal && lowerPw.includes(emailLocal)) {
+    issues.push('No debe contener parte del correo');
+  }
+  if (issues.length) {
+    return `Contraseña insegura: ${issues.join('. ')}.`;
+  }
+  return null;
+}
+
 export default function Register() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
@@ -32,6 +73,9 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Live password validation (mirrors server policy)
+  const pwdError = passwordPolicyIssues(password, username, email);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +93,13 @@ export default function Register() {
     }
     if (hasEmployeeCode && !employeeCode.trim()) {
       setError('El código de empleado es obligatorio cuando indica que tiene uno');
+      return;
+    }
+
+    // Enforce strong password policy on client as well
+    const pwdErr = passwordPolicyIssues(password, username, email);
+    if (pwdErr) {
+      setError(pwdErr);
       return;
     }
 
@@ -135,6 +186,12 @@ export default function Register() {
             onChange={(e) => setPassword(e.target.value)}
             required
             fullWidth
+            error={Boolean(password) && Boolean(pwdError)}
+            helperText={
+              password
+                ? (pwdError ?? 'Contraseña segura')
+                : 'Mín. 12 caracteres y 3 clases: mayúsculas, minúsculas, dígitos, símbolos'
+            }
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">

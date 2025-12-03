@@ -99,6 +99,47 @@ async function logSecurity(event_type: string, username: string | null, ip: stri
     console.error('Failed to log security event', e);
   }
 }
+
+/**
+ * Password policy validation:
+ * - Min length: 12
+ * - At least 3 of: lowercase, uppercase, digit, symbol
+ * - No spaces
+ * - Must not contain username or email local part
+ * Returns null when OK, or a Spanish error message when not.
+ */
+function passwordPolicyIssues(password: string, username: string, email: string): string | null {
+  const issues: string[] = [];
+  const pw = String(password ?? '');
+  const uname = String(username ?? '').toLowerCase();
+  const emailLocal = String(email ?? '').toLowerCase().split('@')[0] || '';
+
+  if (pw.length < 12) {
+    issues.push('Debe tener al menos 12 caracteres');
+  }
+  const hasLower = /[a-z]/.test(pw);
+  const hasUpper = /[A-Z]/.test(pw);
+  const hasDigit = /[0-9]/.test(pw);
+  const hasSymbol = /[^A-Za-z0-9]/.test(pw);
+  const classes = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
+  if (classes < 3) {
+    issues.push('Debe incluir al menos 3 de: mayúsculas, minúsculas, dígitos, símbolos');
+  }
+  if (/\s/.test(pw)) {
+    issues.push('No debe contener espacios');
+  }
+  const lowerPw = pw.toLowerCase();
+  if (uname && lowerPw.includes(uname)) {
+    issues.push('No debe contener el nombre de usuario');
+  }
+  if (emailLocal && lowerPw.includes(emailLocal)) {
+    issues.push('No debe contener parte del correo');
+  }
+  if (issues.length) {
+    return `Contraseña insegura: ${issues.join('. ')}.`;
+  }
+  return null;
+}
  
 async function getCostPerKwh(conn?: any): Promise<number> {
   // Try to read cost_per_kwh from settings table; fall back to DEFAULT_COST_PER_KWH
@@ -147,6 +188,13 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
   // Require username, password, email and either a card or a non-empty employee code
   if (!username || !password || !email || (!card && !empCode)) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  // Enforce strong password policy
+  const pwdError = passwordPolicyIssues(password, username, email);
+  if (pwdError) {
+    await logSecurity('register_weak_password', username, clientIp(req), { error: pwdError });
+    return res.status(400).json({ error: pwdError });
   }
 
   const ip = clientIp(req);
