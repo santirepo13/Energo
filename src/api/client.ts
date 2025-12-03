@@ -150,3 +150,8 @@ export async function auditGetMetrics(days = 30) {
   const res = await api.get('/audit/metrics', { params: { days } });
   return res.data as AuditMetrics;
 }
+
+export async function adminUpdateKwhPrice(price: number) {
+  const res = await api.post('/admin/kwh-price', { price });
+  return res.data as { message: string; cost_per_kwh: number };
+}

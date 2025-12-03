@@ -25,6 +25,10 @@ import {
   Chip,
   Select,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CreditScoreIcon from '@mui/icons-material/CreditScore';
@@ -32,7 +36,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
 import logo from '../assets/logo.png';
 import type { DashboardResponse, AuditMetrics, AdminUserRow } from '../api/client';
-import { getDashboard, recharge, auditListAdmins, auditUpdateStatus, auditGetMetrics } from '../api/client';
+import { getDashboard, recharge, auditListAdmins, auditUpdateStatus, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
 
 const currencyCOP = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -60,7 +64,13 @@ export default function Dashboard() {
   const [pin, setPin] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const cost = data?.cost_per_kwh ?? 900;
+  // Admin kWh price dialog state
+  const [kwhDialogOpen, setKwhDialogOpen] = useState(false);
+  const [kwhDialogPrice, setKwhDialogPrice] = useState<string>('');
+  const [kwhDialogSaving, setKwhDialogSaving] = useState(false);
+  const [kwhDialogError, setKwhDialogError] = useState<string | null>(null);
+
+  const cost = data?.cost_per_kwh ?? 861.88;
   const userStatus = data?.current_user?.status ?? null;
   const isPaused = userStatus === 'Pausa';
   const role = data?.current_user?.role ?? null;
@@ -191,6 +201,31 @@ export default function Dashboard() {
     }
   }
 
+  // Save kWh price (admin)
+  async function handleSaveKwhPrice() {
+    setKwhDialogError(null);
+    const v = Number(kwhDialogPrice.replace(',', '.'));
+    if (!isFinite(v) || v <= 0) {
+      setKwhDialogError('Ingrese un precio válido mayor que 0');
+      return;
+    }
+    setKwhDialogSaving(true);
+    try {
+      const res = await adminUpdateKwhPrice(v);
+      // Update local dashboard state with new cost
+      setData((prev) => {
+        if (!prev) return prev;
+        return { ...prev, cost_per_kwh: res.cost_per_kwh ?? v } as DashboardResponse;
+      });
+      setKwhDialogOpen(false);
+      setKwhDialogPrice('');
+    } catch (e: any) {
+      setKwhDialogError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el precio');
+    } finally {
+      setKwhDialogSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
@@ -212,12 +247,50 @@ export default function Dashboard() {
         <Typography variant="h5" fontWeight={700}>
           Panel de control de Energo
         </Typography>
-        <Chip
-          color="success"
-          label={`Costo: ${formatCOP(cost)} por kWh`}
-          icon={<BoltIcon />}
-          sx={{ ml: 1 }}
-        />
+        {isAdmin ? (
+          <>
+            <Chip
+              color="success"
+              label={`Costo: ${formatCOP(cost)} por kWh`}
+              icon={<BoltIcon />}
+              onClick={() => {
+                setKwhDialogPrice(String(cost));
+                setKwhDialogOpen(true);
+              }}
+              sx={{ ml: 1, cursor: 'pointer' }}
+            />
+            <Dialog open={kwhDialogOpen} onClose={() => setKwhDialogOpen(false)}>
+              <DialogTitle>Actualizar precio por kWh</DialogTitle>
+              <DialogContent>
+                <TextField
+                  label="Precio (COP)"
+                  value={kwhDialogPrice}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                    setKwhDialogPrice(v);
+                  }}
+                  placeholder="861.88"
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                  fullWidth
+                />
+                {kwhDialogError && <Alert severity="error" sx={{ mt: 1 }}>{kwhDialogError}</Alert>}
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setKwhDialogOpen(false)} disabled={kwhDialogSaving}>Cancelar</Button>
+                <Button variant="contained" onClick={handleSaveKwhPrice} disabled={kwhDialogSaving}>
+                  {kwhDialogSaving ? 'Guardando…' : 'Guardar'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </>
+        ) : (
+          <Chip
+            color="success"
+            label={`Costo: ${formatCOP(cost)} por kWh`}
+            icon={<BoltIcon />}
+            sx={{ ml: 1 }}
+          />
+        )}
         {userStatus && (
           <Chip
             color={userStatus === 'Activo' ? 'success' : userStatus === 'Pausa' ? 'warning' : 'default'}

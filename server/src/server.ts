@@ -23,7 +23,7 @@ const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'insecure-dev-secret';
-const DEFAULT_COST_PER_KWH = 900; // COP
+const DEFAULT_COST_PER_KWH = 861.88; // COP (updated default)
 
 const pool: Pool = createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -784,6 +784,66 @@ app.post('/api/admin/users/:id/send-reset', requireAuth, requireAdmin, async (re
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to send reset link' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Admin: update global cost per kWh
+ *
+ * Request body: { price: number }  (price in COP, e.g. 861.88)
+ * Only accessible to authenticated admin users (requireAuth + requireAdmin).
+ *
+ * Behavior:
+ *  - Validate price
+ *  - Begin a DB transaction
+ *  - Upsert the 'cost_per_kwh' value into the settings table
+ *  - Insert a row into kwh_price_history linking to the admin user that made the change
+ *  - Commit and log the change via logSecurity
+ *  - Return the new price in the response
+ */
+app.post('/api/admin/kwh-price', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const username = (req.session as any).username as string | null;
+  const ip = clientIp(req);
+  const { price } = req.body as { price?: number };
+  if (price == null || isNaN(Number(price)) || Number(price) <= 0) {
+    return res.status(400).json({ error: 'Invalid price' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Read old cost using existing helper (uses the provided connection)
+    const oldCost = await getCostPerKwh(conn);
+
+    const newPrice = Number(Number(price).toFixed(2));
+
+    // Upsert into settings table (key is unique)
+    await conn.execute(
+      "INSERT INTO settings (`key`, `value`, `created_at`, `updated_at`) VALUES ('cost_per_kwh', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = CURRENT_TIMESTAMP",
+      [String(newPrice)]
+    );
+
+    // Insert into history table
+    await conn.execute(
+      'INSERT INTO kwh_price_history (admin_user_id, price_cop) VALUES (?, ?)',
+      [userId, newPrice]
+    );
+
+    await conn.commit();
+
+    // Log security event
+    await logSecurity('kwh_price_update', username ?? null, ip, { old: oldCost, new: newPrice });
+
+    res.json({ message: 'Price updated', cost_per_kwh: newPrice });
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    console.error(e);
+    await logSecurity('kwh_price_update_error', (req.session as any)?.username ?? null, ip, { error: e?.message });
+    res.status(500).json({ error: 'Failed to update price' });
   } finally {
     conn.release();
   }
