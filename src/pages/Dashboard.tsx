@@ -78,11 +78,14 @@ export default function Dashboard() {
   const cost = data?.cost_per_kwh ?? 861.88;
   const userStatus = data?.current_user?.status ?? null;
   const isPaused = userStatus === 'Pausa';
-  const role = data?.current_user?.role ?? null;
-  const isAdmin = role === 'admin';
-  const showCardAndRecharge = role !== 'admin' && role !== 'audit';
-  const showHistory = role !== 'audit'; // admin + regular users
-  const showLogs = role === 'audit';    // only auditors
+  const role = (data?.current_user?.role ?? null) as string | null;
+  const normRole = role ? role.toLowerCase() : null;
+  // Be tolerant to DB/localization differences (e.g., 'Administrador', 'Administrator')
+  const isAdmin = normRole === 'admin' || normRole === 'administrator' || normRole === 'administrador';
+  const isAudit = normRole === 'audit' || normRole === 'auditor' || normRole === 'auditoría' || normRole === 'auditoria';
+  const showCardAndRecharge = !isAdmin && !isAudit;
+  const showHistory = !isAudit; // admin + regular users
+  const showLogs = isAudit;     // only auditors
 
   const STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
 
@@ -413,7 +416,7 @@ export default function Dashboard() {
           <Paper sx={{ p: 2 }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <HistoryIcon color="primary" />
-              <Typography variant="h6">{role === 'admin' ? 'Últimos movimientos' : 'Historial de Recargas'}</Typography>
+              <Typography variant="h6">{isAdmin ? 'Últimos movimientos' : 'Historial de Recargas'}</Typography>
             </Stack>
             <Table size="small">
               <TableHead>
