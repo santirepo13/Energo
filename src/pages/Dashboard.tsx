@@ -48,6 +48,11 @@ function formatCOP(n: number) {
   return currencyCOP.format(Math.round(n));
 }
 
+function formatCOPCost(n: number) {
+  // Show exactly two decimals and explicit COP, e.g. "861.88 COP"
+  return `${Number(n).toFixed(2)} COP`;
+}
+
 function formatKwh(n: number) {
   return `${Number(n).toFixed(2)} kWh`;
 }
@@ -136,11 +141,11 @@ export default function Dashboard() {
     if (mode === 'cop') {
       const v = Number(cop);
       if (!isFinite(v) || v <= 0) return '';
-      return `${formatKwh(v / cost)} (a ${formatCOP(cost)} por kWh)`;
+      return `${formatKwh(v / cost)} (a ${formatCOPCost(cost)} por kWh)`;
     } else {
       const v = Number(kwh);
       if (!isFinite(v) || v <= 0) return '';
-      return `${formatCOP(v * cost)} (a ${formatCOP(cost)} por kWh)`;
+      return `${formatCOP(v * cost)} (a ${formatCOPCost(cost)} por kWh)`;
     }
   }, [mode, cop, kwh, cost]);
 
@@ -251,7 +256,8 @@ export default function Dashboard() {
           <>
             <Chip
               color="success"
-              label={`Costo: ${formatCOP(cost)} por kWh`}
+              clickable
+              label={`Costo: ${formatCOPCost(cost)} por kWh`}
               icon={<BoltIcon />}
               onClick={() => {
                 setKwhDialogPrice(String(cost));
@@ -370,7 +376,7 @@ export default function Dashboard() {
                   InputProps={{
                     startAdornment: <InputAdornment position="start">$</InputAdornment>,
                   }}
-                  helperText={equivalent || `Costo actual: ${formatCOP(cost)} por kWh`}
+                  helperText={equivalent || `Costo actual: ${formatCOPCost(cost)} por kWh`}
                   disabled={submitting || isPaused}
                   required
                   fullWidth
@@ -385,7 +391,7 @@ export default function Dashboard() {
                   }}
                   placeholder="10"
                   inputProps={{ inputMode: 'decimal' }}
-                  helperText={equivalent || `Costo actual: ${formatCOP(cost)} por kWh`}
+                  helperText={equivalent || `Costo actual: ${formatCOPCost(cost)} por kWh`}
                   disabled={submitting || isPaused}
                   required
                   fullWidth
