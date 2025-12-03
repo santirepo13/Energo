@@ -282,27 +282,29 @@ export default function Dashboard() {
             </ButtonBase>
             <Dialog open={kwhDialogOpen} onClose={() => setKwhDialogOpen(false)} PaperProps={{ sx: { bgcolor: '#fff' } }}>
               <DialogTitle>Actualizar precio por kWh</DialogTitle>
-              <DialogContent sx={{ pt: 2 }}>
-                <TextField
-                  label="Precio (COP)"
-                  value={kwhDialogPrice}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
-                    setKwhDialogPrice(v);
-                  }}
-                  placeholder="861.88"
-                  variant="outlined"
-                  fullWidth
-                  autoFocus
-                  InputLabelProps={{ shrink: true, sx: { bgcolor: '#fff', px: 0.5, zIndex: 1 } }}
-                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment>, notched: false }}
-                  inputProps={{ inputMode: 'decimal' }}
-                  sx={{
-                    bgcolor: '#fff',
-                    '& .MuiOutlinedInput-notchedOutline legend': { maxWidth: 0 }
-                  }}
-                />
-                {kwhDialogError && <Alert severity="error" sx={{ mt: 1 }}>{kwhDialogError}</Alert>}
+              <DialogContent sx={{ pt: 3 }}>
+                <Stack spacing={1.5}>
+                  <FormLabel htmlFor="kwh-price-input" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    Precio (COP)
+                  </FormLabel>
+                  <TextField
+                    id="kwh-price-input"
+                    value={kwhDialogPrice}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                      setKwhDialogPrice(v);
+                    }}
+                    placeholder="861.88"
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    autoFocus
+                    InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                    inputProps={{ inputMode: 'decimal' }}
+                    sx={{ bgcolor: '#fff' }}
+                  />
+                  {kwhDialogError && <Alert severity="error">{kwhDialogError}</Alert>}
+                </Stack>
               </DialogContent>
               <DialogActions>
                 <Button onClick={() => setKwhDialogOpen(false)} disabled={kwhDialogSaving}>Cancelar</Button>
