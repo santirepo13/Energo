@@ -383,7 +383,7 @@ export default function Dashboard() {
         ) : (
           <Chip
             color="success"
-            label={`Costo: ${formatCOP(cost)} por kWh`}
+            label={`Costo: ${formatCOPCost(cost)} por kWh`}
             icon={<BoltIcon />}
             sx={{ ml: 1 }}
           />
