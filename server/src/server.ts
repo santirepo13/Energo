@@ -43,13 +43,28 @@ const pool: Pool = createPool({
   connectionLimit: 10,
   queueLimit: 0,
 });
-
+ 
+// Stored procedure helpers (MariaDB 10.x compatible)
+// Builds placeholders and unwraps the first resultset of CALL responses.
+function procPlaceholders(n: number): string {
+  return n > 0 ? Array(n).fill('?').join(',') : '';
+}
+async function callAll<T = any>(conn: any, proc: string, params: any[] = []): Promise<T[]> {
+  const sql = `CALL ${proc}(${procPlaceholders(params.length)})`;
+  const [rows]: any = await conn.query(sql, params);
+  const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
+  return Array.isArray(firstSet) ? (firstSet as T[]) : [];
+}
+async function callFirst<T = any>(conn: any, proc: string, params: any[] = []): Promise<T | null> {
+  const all = await callAll<T>(conn, proc, params);
+  return all.length ? all[0] : null;
+}
 // Test DB connection on startup and log a clear status (non-fatal in dev)
 async function testDbConnection() {
   try {
     const conn = await pool.getConnection();
     try {
-      await conn.query('SELECT 1');
+      await conn.query('CALL sp_ping()');
       console.log(
         `Database connection OK to ${process.env.DB_HOST || 'localhost'}:${Number(process.env.DB_PORT || 3306)} as ${process.env.DB_USER || 'root'} db ${process.env.DB_NAME || 'ener-go'}`
       );
@@ -129,10 +144,8 @@ async function logSecurity(event_type: string, username: string | null, ip: stri
   try {
     const conn = await pool.getConnection();
     try {
-      await conn.execute(
-        'INSERT INTO security_logs (event_type, username, ip_address, details) VALUES (?, ?, ?, ?)',
-        [event_type, username, ip, typeof details === 'string' ? details : JSON.stringify(details)]
-      );
+      const payload = typeof details === 'string' ? details : JSON.stringify(details);
+      await conn.query('CALL sp_security_logs_insert(?, ?, ?, ?)', [event_type, username, ip, payload]);
     } finally {
       conn.release();
     }
@@ -183,24 +196,20 @@ function passwordPolicyIssues(password: string, username: string, email: string)
 }
  
 async function getCostPerKwh(conn?: any): Promise<number> {
-  // Try to read cost_per_kwh from settings table; fall back to DEFAULT_COST_PER_KWH
+  // Fetch from settings via stored procedure; fall back to DEFAULT_COST_PER_KWH
   try {
     if (conn) {
-      const [rows] = await conn.execute(
-        "SELECT value FROM settings WHERE `key` = 'cost_per_kwh' LIMIT 1"
-      );
-      if (Array.isArray(rows) && (rows as any[]).length > 0) {
-        const v = parseFloat((rows as any)[0].value);
+      const row = await callFirst<any>(conn, 'sp_settings_get', ['cost_per_kwh']);
+      if (row && row.value != null) {
+        const v = parseFloat(String(row.value));
         if (!isNaN(v) && v > 0) return v;
       }
     } else {
       const tempConn = await pool.getConnection();
       try {
-        const [rows] = await tempConn.execute(
-          "SELECT value FROM settings WHERE `key` = 'cost_per_kwh' LIMIT 1"
-        );
-        if (Array.isArray(rows) && (rows as any).length > 0) {
-          const v = parseFloat((rows as any)[0].value);
+        const row = await callFirst<any>(tempConn, 'sp_settings_get', ['cost_per_kwh']);
+        if (row && row.value != null) {
+          const v = parseFloat(String(row.value));
           if (!isNaN(v) && v > 0) return v;
         }
       } finally {
@@ -244,12 +253,9 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     // Use a transaction because we will potentially lock employee_codes and insert user + card
     await conn.beginTransaction();
 
-    // check duplicates
-    const [userRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1',
-      [username, email]
-    );
-    if (userRows.length > 0) {
+    // check duplicates (proc)
+    const dup = await callFirst<any>(conn, 'sp_users_find_by_username_or_email', [username, email]);
+    if (dup) {
       await conn.rollback();
       await logSecurity('register_duplicate', username, ip, { username, email });
       return res.status(400).json({ error: 'Username or email already exists' });
@@ -257,36 +263,26 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
 
      // If a card number was provided, only block when it's already assigned to a user.
      if (card) {
-       const [cardRows] = await conn.execute<RowDataPacket[]>(
-         'SELECT id, user_id FROM energy_cards WHERE card_number = ? LIMIT 1',
-         [card]
-       );
-       if ((cardRows as any[]).length > 0) {
-         const cr = (cardRows as any[])[0] as any;
-         if (cr.user_id != null) {
-           await conn.rollback();
-           await logSecurity('register_duplicate_card', username, ip, { card_number: card });
-           return res.status(400).json({ error: 'Medidor ya enlazado, por favor contacte a soporte' });
-         }
-         // If user_id is NULL (released), allow registration to proceed and we will claim it after creating the user.
+       const cr = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+       if (cr && cr.user_id != null) {
+         await conn.rollback();
+         await logSecurity('register_duplicate_card', username, ip, { card_number: card });
+         return res.status(400).json({ error: 'Medidor ya enlazado, por favor contacte a soporte' });
        }
+       // If user_id is NULL (released), allow registration to proceed and we will claim it after creating the user.
      }
 
     // Determine role_id: default to 'user', or use employee_code to set admin/audit
     let role_id: number | null = null;
     let employeeCodeId: number | null = null;
     if (empCode) {
-      // Lock the employee_codes row so two requests can't use the same code concurrently
-      const [codeRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT id, role_id, used FROM employee_codes WHERE code = ? LIMIT 1 FOR UPDATE',
-        [empCode]
-      );
-      if ((codeRows as any[]).length === 0) {
+      // Lock and read employee code via stored procedure
+      const codeRow = await callFirst<any>(conn, 'sp_employee_codes_get_for_update', [empCode]);
+      if (!codeRow) {
         await conn.rollback();
         await logSecurity('register_bad_code', username, ip, { employee_code: empCode });
         return res.status(400).json({ error: 'Invalid employee code' });
       }
-      const codeRow = (codeRows as any[])[0];
       if (Number(codeRow.used) === 1) {
         await conn.rollback();
         await logSecurity('register_code_used', username, ip, { employee_code: empCode });
@@ -296,62 +292,42 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
       employeeCodeId = Number(codeRow.id);
     } else {
       // fetch default 'user' role id
-      const [roleRows] = await conn.execute<RowDataPacket[]>(
-        "SELECT id FROM roles WHERE name = 'user' LIMIT 1"
-      );
-      if ((roleRows as any[]).length === 0) {
+      const roleRow = await callFirst<any>(conn, 'sp_roles_get_id_by_name', ['user']);
+      if (!roleRow) {
         await conn.rollback();
         console.error('Missing default role "user" in roles table');
         return res.status(500).json({ error: 'Server misconfiguration' });
       }
-      role_id = Number((roleRows as any[])[0].id);
+      role_id = Number(roleRow.id);
     }
 
     // Resolve default status 'Activo'
-    const [statusRows] = await conn.execute<RowDataPacket[]>(
-      "SELECT id FROM statuses WHERE name = 'Activo' LIMIT 1"
-    );
-    if ((statusRows as any[]).length === 0) {
+    const st = await callFirst<any>(conn, 'sp_statuses_get_id_by_name', ['Activo']);
+    if (!st) {
       await conn.rollback();
       console.error('Missing default status "Activo" in statuses table');
       return res.status(500).json({ error: 'Server misconfiguration' });
     }
-    const status_id = Number((statusRows as any[])[0].id);
+    const status_id = Number(st.id);
 
     const password_hash = await bcrypt.hash(password, 10);
-    const [userResult] = await conn.execute<ResultSetHeader>(
-      'INSERT INTO users (username, password_hash, email, role_id, status_id) VALUES (?, ?, ?, ?, ?)',
-      [username, password_hash, email, role_id, status_id]
-    );
-    const user_id = (userResult as ResultSetHeader).insertId;
+    const userIns = await callAll<any>(conn, 'sp_users_insert', [username, password_hash, email, role_id, status_id]);
+    const user_id = Number((userIns[0] || {}).inserted_id);
  
      // Link or create energy card if a non-empty normalized `card` was provided
      if (card) {
        try {
-         // Try to claim a released meter if it already exists with no owner
-         const [existing] = await conn.execute<RowDataPacket[]>(
-           'SELECT id, user_id FROM energy_cards WHERE card_number = ? LIMIT 1',
-           [card]
-         );
-         if ((existing as any[]).length > 0) {
-           const er = (existing as any[])[0] as any;
+         const er = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+         if (er) {
            if (er.user_id == null) {
-             await conn.execute(
-               'UPDATE energy_cards SET user_id = ?, released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
-               [user_id, Number(er.id)]
-             );
+             await conn.query('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [Number(er.id), user_id, null]);
            } else {
-             // Safety: should be prevented by earlier check
              await conn.rollback();
              await logSecurity('register_duplicate_card', username, ip, { card_number: card });
              return res.status(400).json({ error: 'Medidor ya enlazado, por favor contacte a soporte' });
            }
          } else {
-           // Create a brand new meter
-           await conn.execute(
-             'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
-             [user_id, card]
-           );
+           await conn.query('CALL sp_energy_cards_insert(?, ?, ?)', [user_id, card, null]);
          }
        } catch (e: any) {
          if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
@@ -366,17 +342,11 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     // Mark employee code as used (if applicable) and record usage in mapping table
     if (empCode && employeeCodeId != null) {
       // Record the usage by inserting into employee_code_usages (this references users and employee_codes)
-      const [usageResult] = await conn.execute<ResultSetHeader>(
-        'INSERT INTO employee_code_usages (employee_code_id, user_id) VALUES (?, ?)',
-        [employeeCodeId, user_id]
-      );
-      const usageId = (usageResult as ResultSetHeader).insertId;
- 
+      const usageRes = await callAll<any>(conn, 'sp_employee_code_usages_insert', [employeeCodeId, user_id]);
+      const usageId = Number((usageRes[0] || {}).inserted_id);
+
       // Update the employee_codes row to mark it used, set used_at, and link to the usage record
-      await conn.execute(
-        'UPDATE employee_codes SET used = 1, used_at = CURRENT_TIMESTAMP, employee_usage_id = ? WHERE id = ?',
-        [usageId, employeeCodeId]
-      );
+      await conn.query('CALL sp_employee_codes_mark_used(?, ?)', [employeeCodeId, usageId]);
     }
 
     await conn.commit();
@@ -402,20 +372,11 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
   const ip = clientIp(req);
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT u.id, u.password_hash, r.name AS role_name, s.name AS status_name
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE u.username = ?
-       LIMIT 1`,
-      [username]
-    );
-    if (rows.length === 0) {
+    const user = await callFirst<any>(conn, 'sp_users_select_login_by_username', [username]);
+    if (!user) {
       await logSecurity('login_failed', username, ip, { reason: 'user_not_found' });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const user = rows[0] as any;
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
       await logSecurity('login_failed', username, ip, { reason: 'bad_password' });
@@ -452,7 +413,7 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
     (req.session as any).username = username;
     (req.session as any).role = user.role_name || null;
     (req.session as any).status = statusName || null;
-    await conn.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    await conn.query('CALL sp_users_update_last_login(?)', [user.id]);
     await logSecurity('login_success', username, ip, { role: user.role_name, status: statusName });
     res.json({ message: 'Login successful' });
   } catch (e: any) {
@@ -474,35 +435,17 @@ app.post('/api/mock/pausa/verify', async (req: express.Request, res: express.Res
   const conn = await pool.getConnection();
   try {
     // Ensure the account exists and is currently in 'Pausa'
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT u.id, s.name AS status_name
-       FROM users u
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE u.username = ?
-       LIMIT 1`,
-      [uname]
-    );
-    if ((rows as any[]).length === 0) {
+    const u = await callFirst<any>(conn, 'sp_users_select_login_by_username', [uname]);
+    if (!u) {
       await logSecurity('pause_verify_user_not_found', uname, ip, {});
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    const u = (rows as any[])[0] as any;
     const currentStatus = (u.status_name ?? '').toString();
     if (currentStatus !== 'Pausa') {
       return res.status(400).json({ error: 'La cuenta no está en pausa' });
     }
 
-    // Resolve 'Activo' status id
-    const [srows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
-      ['Activo']
-    );
-    if ((srows as any[]).length === 0) {
-      return res.status(500).json({ error: 'Misconfiguración del servidor (status Activo faltante)' });
-    }
-    const activeId = Number((srows as any[])[0].id);
-
-    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [activeId, Number(u.id)]);
+    await conn.query('CALL sp_users_update_status_by_name(?, ?)', [Number(u.id), 'Activo']);
     await logSecurity('pause_restored_mock', uname, ip, { user_id: Number(u.id) });
     return res.json({ message: 'Cuenta reactivada' });
   } catch (e: any) {
@@ -517,17 +460,8 @@ app.post('/api/mock/pausa/verify', async (req: express.Request, res: express.Res
 async function getUserRoleAndStatus(userId: number): Promise<{ role: string | null; status: string | null } | null> {
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT r.name AS role_name, s.name AS status_name
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE u.id = ?
-       LIMIT 1`,
-      [userId]
-    );
-    if ((rows as any[]).length === 0) return null;
-    const r = rows[0] as any;
+    const r = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [userId]);
+    if (!r) return null;
     return { role: (r.role_name ?? null), status: (r.status_name ?? null) };
   } finally {
     conn.release();
@@ -587,15 +521,7 @@ function requireAudit(req: express.Request, res: express.Response, next: express
 app.get('/api/audit/admins', requireAuth, requireAudit, async (_req: express.Request, res: express.Response) => {
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT u.id, u.username, u.email, u.created_at, u.last_login,
-              r.name AS role, s.name AS status
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE r.name = 'admin'
-       ORDER BY u.created_at DESC`
-    );
+    const rows = await callAll<any>(conn, 'sp_audit_list_admins', []);
     res.json({ users: rows });
   } catch (e) {
     console.error(e);
@@ -609,15 +535,7 @@ app.get('/api/audit/admins', requireAuth, requireAudit, async (_req: express.Req
 app.get('/api/audit/employees', requireAuth, requireAudit, async (_req: express.Request, res: express.Response) => {
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT u.id, u.username, u.email, u.created_at, u.last_login,
-              r.name AS role, s.name AS status
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE r.name IN ('admin','audit')
-       ORDER BY u.created_at DESC`
-    );
+    const rows = await callAll<any>(conn, 'sp_audit_list_employees', []);
     res.json({ users: rows });
   } catch (e) {
     console.error(e);
@@ -635,12 +553,9 @@ app.patch('/api/audit/users/:id/status', requireAuth, requireAudit, async (req: 
   const conn = await pool.getConnection();
   try {
     // Ensure target user is admin or audit
-    const [roleRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
-      [id]
-    );
-    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
-    const targetRole = ((roleRows as any[])[0] as any).role as string | null;
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [id]);
+    if (!info) return res.status(404).json({ error: 'User not found' });
+    const targetRole = (info.role_name ?? null) as string | null;
     if (targetRole !== 'admin' && targetRole !== 'audit') return res.status(403).json({ error: 'Can only modify admin/audit users' });
 
     // validate allowed statuses (admins: only Activo/Deshabilitado)
@@ -650,13 +565,7 @@ app.patch('/api/audit/users/:id/status', requireAuth, requireAudit, async (req: 
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    const [srows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
-      [status]
-    );
-    if ((srows as any[]).length === 0) return res.status(400).json({ error: 'Status not found' });
-    const statusId = Number((srows as any[])[0].id);
-    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [statusId, id]);
+    await conn.query('CALL sp_users_update_status_by_name(?, ?)', [id, status]);
     res.json({ message: 'Status updated' });
   } catch (e) {
     console.error(e);
@@ -671,23 +580,10 @@ app.get('/api/audit/metrics', requireAuth, requireAudit, async (req: express.Req
   const days = Math.max(1, Math.min(365, Number((req.query.days as string) ?? 30) || 30));
   const conn = await pool.getConnection();
   try {
-    const [totalsRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS pins, COALESCE(SUM(amount),0) AS total_amount, COALESCE(SUM(kwh),0) AS total_kwh
-       FROM recharge_pins`
-    );
-    const totals = (totalsRows as any[])[0] || { pins: 0, total_amount: 0, total_kwh: 0 };
+    const totalsRow = await callFirst<any>(conn, 'sp_audit_metrics_totals', []);
+    const totals = totalsRow || { pins: 0, total_amount: 0, total_kwh: 0 };
 
-    const [seriesRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT DATE(created_at) AS day,
-              COUNT(*) AS pins,
-              COALESCE(SUM(amount),0) AS amount,
-              COALESCE(SUM(kwh),0) AS kwh
-       FROM recharge_pins
-       WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-       GROUP BY DATE(created_at)
-       ORDER BY DATE(created_at) ASC`,
-      [days]
-    );
+    const seriesRows = await callAll<any>(conn, 'sp_audit_metrics_series', [days]);
 
     res.json({
       totals: {
@@ -714,12 +610,7 @@ app.get('/api/audit/metrics', requireAuth, requireAudit, async (req: express.Req
 app.get('/api/audit/employee-codes', requireAuth, requireAudit, async (_req: express.Request, res: express.Response) => {
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT ec.id, ec.code, ec.used, ec.created_at, ec.used_at, r.name AS role
-       FROM employee_codes ec
-       LEFT JOIN roles r ON r.id = ec.role_id
-       ORDER BY ec.created_at DESC`
-    );
+    const rows = await callAll<any>(conn, 'sp_employee_codes_list', []);
     res.json({ codes: rows });
   } catch (e) {
     console.error(e);
@@ -740,12 +631,9 @@ app.post('/api/audit/employee-codes', requireAuth, requireAudit, async (req: exp
   const conn = await pool.getConnection();
   try {
     // Resolve role_id
-    const [rrows] = await conn.execute<RowDataPacket[]>(
-      `SELECT id FROM roles WHERE name = ? LIMIT 1`,
-      [roleName]
-    );
-    if ((rrows as any[]).length === 0) return res.status(400).json({ error: 'Role not found' });
-    const roleId = Number((rrows as any[])[0].id);
+    const roleRow = await callFirst<any>(conn, 'sp_roles_get_id_by_name', [roleName]);
+    if (!roleRow) return res.status(400).json({ error: 'Role not found' });
+    const roleId = Number(roleRow.id);
 
     let code = '';
     let attempts = 0;
@@ -757,11 +645,8 @@ app.post('/api/audit/employee-codes', requireAuth, requireAudit, async (req: exp
         .join('');
       code = `${prefix}-${rand}`;
       try {
-        const [ins] = await conn.execute<ResultSetHeader>(
-          'INSERT INTO employee_codes (code, role_id, used) VALUES (?, ?, 0)',
-          [code, roleId]
-        );
-        const id = (ins as ResultSetHeader).insertId;
+        const ins = await callAll<any>(conn, 'sp_employee_codes_insert', [code, roleId]);
+        const id = Number((ins[0] || {}).inserted_id);
         await logSecurity('employee_code_generated', (req.session as any)?.username ?? null, ip, { code, role: roleName });
         return res.json({ id, code, role: roleName });
       } catch (e: any) {
@@ -787,16 +672,7 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
   const conn = await pool.getConnection();
   try {
     // Fetch role/status first so we can tailor the dashboard by role
-    const [infoRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT u.username, r.name AS role_name, s.name AS status_name
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE u.id = ?
-       LIMIT 1`,
-      [userId]
-    );
-    const info = (infoRows as any[])[0] || { username, role_name: null, status_name: null };
+    const info = (await callFirst<any>(conn, 'sp_users_info_by_id', [userId])) || { username, role_name: null, status_name: null };
     const role = (info.role_name ?? null) as string | null;
 
     let cards: any[] = [];
@@ -806,30 +682,20 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
 
     if (role === 'admin') {
       // Admin: show global "Últimos movimientos" (all users), hide logs and card/cards
-      const [pinRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number FROM recharge_pins rp LEFT JOIN users u ON u.id = rp.user_id ORDER BY rp.created_at DESC LIMIT 100'
-      );
+      const pinRows = await callAll<any>(conn, 'sp_recharge_pins_latest', [100]);
       pins = pinRows as any[];
       // logs remain empty; card/cards remain null/empty
     } else if (role === 'audit') {
       // Audit: show global security logs for all users, hide card/cards and recharge history
-      const [logRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT event_type, event_time, ip_address, details FROM security_logs ORDER BY event_time DESC LIMIT 200'
-      );
+      const logRows = await callAll<any>(conn, 'sp_security_logs_latest', [200]);
       logs = logRows as any[];
     } else {
       // Regular user: own cards, own history, and hide logs
-      const [cardRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT card_number, name, current_balance, current_kwh FROM energy_cards WHERE user_id = ? ORDER BY COALESCE(name, card_number) ASC',
-        [userId]
-      );
+      const cardRows = await callAll<any>(conn, 'sp_energy_cards_list_by_user', [userId]);
       cards = cardRows as any[];
       card = (cards as any[])[0] || null;
 
-      const [pinRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number FROM recharge_pins rp LEFT JOIN users u ON u.id = rp.user_id WHERE rp.user_id = ? ORDER BY rp.created_at DESC',
-        [userId]
-      );
+      const pinRows = await callAll<any>(conn, 'sp_recharge_pins_list_by_user', [userId]);
       pins = pinRows as any[];
 
       // Hide logs for non-audit roles
@@ -924,15 +790,8 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
   const conn = await pool.getConnection();
   try {
     // Check status; block when in Pausa/Deshabilitado/Suspendido for recharges
-    const [statusRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT s.name AS status_name
-       FROM users u
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE u.id = ?
-       LIMIT 1`,
-      [userId]
-    );
-    const statusName = (statusRows as any[])[0]?.status_name as string | undefined;
+    const statusInfo = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [userId]);
+    const statusName = (statusInfo?.status_name ?? undefined) as string | undefined;
     if (statusName === 'Pausa' || statusName === 'Deshabilitado' || statusName === 'Suspendido') {
       return res.status(403).json({ error: `No puede recargar mientras la cuenta está en "${statusName}".` });
     }
@@ -952,20 +811,14 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
 
     let card: any;
     if (selectedCardNumber) {
-      const [cardRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ? FOR UPDATE',
-        [userId, selectedCardNumber]
-      );
-      if ((cardRows as any[]).length === 0) {
+      const r = await callFirst<any>(conn, 'sp_energy_cards_select_by_user_and_card_for_update', [userId, selectedCardNumber]);
+      if (!r) {
         await conn.rollback();
         return res.status(400).json({ error: 'No energy card for user with that card_number' });
       }
-      card = (cardRows as any[])[0] as any;
+      card = r as any;
     } else {
-      const [cardRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? FOR UPDATE',
-        [userId]
-      );
+      const cardRows = await callAll<any>(conn, 'sp_energy_cards_select_one_by_user_for_update', [userId]);
       if ((cardRows as any[]).length === 0) {
         await conn.rollback();
         return res.status(400).json({ error: 'No energy card for user' });
@@ -979,15 +832,9 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
 
     const newBalance = +(Number(card.current_balance) + amountCOP).toFixed(2);
     const newKwh = +(Number(card.current_kwh) + kwhVal).toFixed(2);
-    await conn.execute(
-      'UPDATE energy_cards SET current_balance = ?, current_kwh = ?, last_recharge = CURRENT_TIMESTAMP WHERE user_id = ? AND card_number = ?',
-      [newBalance, newKwh, userId, card.card_number]
-    );
+    await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, card.card_number, newBalance, newKwh]);
     const pin = generateSts20Token(card.card_number, amountCOP, kwhVal);
-    await conn.execute(
-      'INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh) VALUES (?, ?, ?, ?, ?)',
-      [userId, card.card_number, pin, amountCOP, kwhVal]
-    );
+    await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, card.card_number, pin, amountCOP, kwhVal]);
     await conn.commit();
     await logSecurity('recharge', username, ip, { amount: amountCOP, kwh: kwhVal, pin, card_number: card.card_number });
     res.json({
@@ -1020,15 +867,7 @@ app.post('/api/logout', requireAuth, async (req: express.Request, res: express.R
 app.get('/api/admin/users', requireAuth, requireAdmin, async (_req: express.Request, res: express.Response) => {
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      `SELECT u.id, u.username, u.email, u.created_at, u.last_login,
-              r.name AS role, s.name AS status
-       FROM users u
-       LEFT JOIN roles r ON r.id = u.role_id
-       LEFT JOIN statuses s ON s.id = u.status_id
-       WHERE r.name <> 'audit'
-       ORDER BY u.created_at DESC`
-    );
+    const rows = await callAll<any>(conn, 'sp_admin_list_users', []);
     res.json({ users: rows });
   } catch (e) {
     console.error(e);
@@ -1046,21 +885,15 @@ app.patch('/api/admin/users/:id/email', requireAuth, requireAdmin, async (req: e
   const conn = await pool.getConnection();
   try {
     // Block modifications to audit users
-    const [roleRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
-      [id]
-    );
-    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
-    const targetRole = ((roleRows as any[])[0] as any).role as string | null;
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [id]);
+    if (!info) return res.status(404).json({ error: 'User not found' });
+    const targetRole = (info.role_name ?? null) as string | null;
     if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
 
     // ensure not taken
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
-      [email, id]
-    );
-    if ((rows as any[]).length > 0) return res.status(400).json({ error: 'Email already in use' });
-    await conn.execute('UPDATE users SET email = ? WHERE id = ?', [email, id]);
+    const exists = await callFirst<any>(conn, 'sp_users_email_exists_other', [email, id]);
+    if (exists) return res.status(400).json({ error: 'Email already in use' });
+    await conn.query('CALL sp_users_update_email(?, ?)', [id, email]);
     res.json({ message: 'Email updated' });
   } catch (e) {
     console.error(e);
@@ -1078,12 +911,9 @@ app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req: 
   const conn = await pool.getConnection();
   try {
     // Block modifications to audit users
-    const [roleRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
-      [id]
-    );
-    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
-    const targetRole = ((roleRows as any[])[0] as any).role as string | null;
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [id]);
+    if (!info) return res.status(404).json({ error: 'User not found' });
+    const targetRole = (info.role_name ?? null) as string | null;
     if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
 
     // validate allowed statuses (admins: only Activo/Deshabilitado)
@@ -1093,13 +923,7 @@ app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req: 
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    const [srows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
-      [status]
-    );
-    if ((srows as any[]).length === 0) return res.status(400).json({ error: 'Status not found' });
-    const statusId = Number((srows as any[])[0].id);
-    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [statusId, id]);
+    await conn.query('CALL sp_users_update_status_by_name(?, ?)', [id, status]);
     res.json({ message: 'Status updated' });
   } catch (e) {
     console.error(e);
@@ -1128,26 +952,18 @@ app.post('/api/admin/meters/transfer', requireAuth, requireAdmin, async (req: ex
     await conn.beginTransaction();
 
     // Ensure destination user exists
-    const [urows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM users WHERE id = ? LIMIT 1',
-      [toUserId]
-    );
-    if ((urows as any[]).length === 0) {
+    const urows = await callFirst<any>(conn, 'sp_users_exists_by_id', [toUserId]);
+    if (!urows) {
       await conn.rollback();
       return res.status(404).json({ error: 'Usuario destino no existe' });
     }
 
     // Lock meter row
-    const [crows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id, user_id FROM energy_cards WHERE card_number = ? LIMIT 1 FOR UPDATE',
-      [card]
-    );
-    if ((crows as any[]).length === 0) {
+    const current = await callFirst<any>(conn, 'sp_energy_cards_lock_by_card', [card]);
+    if (!current) {
       await conn.rollback();
       return res.status(404).json({ error: 'Medidor no existe' });
     }
-
-    const current = (crows as any[])[0] as any;
     const fromUserId = current.user_id == null ? null : Number(current.user_id);
 
     if (fromUserId === toUserId) {
@@ -1156,10 +972,7 @@ app.post('/api/admin/meters/transfer', requireAuth, requireAdmin, async (req: ex
     }
 
     // Transfer ownership and clear release flags
-    await conn.execute(
-      'UPDATE energy_cards SET user_id = ?, released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
-      [toUserId, Number(current.id)]
-    );
+    await conn.query('CALL sp_energy_cards_transfer_owner(?, ?)', [Number(current.id), toUserId]);
 
     await conn.commit();
     await logSecurity('admin_meter_transfer', adminUsername, ip, { card_number: card, from_user_id: fromUserId, to_user_id: toUserId });
@@ -1177,13 +990,10 @@ app.post('/api/admin/meters/transfer', requireAuth, requireAdmin, async (req: ex
   const conn = await pool.getConnection();
   try {
     // Block actions on audit users
-    const [roleRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT u.username, u.email, r.name AS role FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ? LIMIT 1',
-      [id]
-    );
-    if ((roleRows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
-    const u = (roleRows as any[])[0] as any;
-    if ((u.role as string | null) === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [id]);
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [id]);
+    if (!info || !u) return res.status(404).json({ error: 'User not found' });
+    if ((info.role_name as string | null) === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
 
     const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     const resetLink = `${CLIENT_ORIGIN}/reset-password?token=${token}`;
@@ -1230,16 +1040,10 @@ app.post('/api/admin/kwh-price', requireAuth, requireAdmin, async (req: express.
     const newPrice = Number(price);
 
     // Upsert into settings table (key is unique)
-    await conn.execute(
-      "INSERT INTO settings (`key`, `value`, `created_at`, `updated_at`) VALUES ('cost_per_kwh', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = CURRENT_TIMESTAMP",
-      [String(newPrice)]
-    );
+    await conn.query('CALL sp_settings_upsert_cost_per_kwh(?)', [String(newPrice)]);
 
     // Insert into history table
-    await conn.execute(
-      'INSERT INTO kwh_price_history (admin_user_id, price_cop) VALUES (?, ?)',
-      [userId, newPrice]
-    );
+    await conn.query('CALL sp_kwh_price_history_insert(?, ?)', [userId, newPrice]);
 
     await conn.commit();
 
@@ -1269,21 +1073,11 @@ app.get('/api/me/profile', requireAuth, async (req: express.Request, res: expres
   const userId = (req.session as any).userId as number;
   const conn = await pool.getConnection();
   try {
-    const [urows] = await conn.execute<RowDataPacket[]>(
-      'SELECT username, email FROM users WHERE id = ? LIMIT 1',
-      [userId]
-    );
-    if ((urows as any[]).length === 0) {
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [userId]);
+    if (!u) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    const [prows] = await conn.execute<RowDataPacket[]>(
-      `SELECT primer_nombre, segundo_nombre, primer_apellido, segundo_apellido,
-              tipo_identificacion, numero_identificacion, direccion, telefono
-       FROM user_profiles WHERE user_id = ? LIMIT 1`,
-      [userId]
-    );
-    const u = (urows as any[])[0] as any;
-    const profile = (prows as any[]).length > 0 ? (prows as any[])[0] : null;
+    const profile = await callFirst<any>(conn, 'sp_user_profiles_get_by_user', [userId]);
     res.json({ username: String(u.username), email: String(u.email), profile });
   } catch (e) {
     console.error(e);
@@ -1331,23 +1125,7 @@ app.put('/api/me/profile', requireAuth, async (req: express.Request, res: expres
 
   const conn = await pool.getConnection();
   try {
-    await conn.execute(
-      `INSERT INTO user_profiles
-       (user_id, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido,
-        tipo_identificacion, numero_identificacion, direccion, telefono)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         primer_nombre = VALUES(primer_nombre),
-         segundo_nombre = VALUES(segundo_nombre),
-         primer_apellido = VALUES(primer_apellido),
-         segundo_apellido = VALUES(segundo_apellido),
-         tipo_identificacion = VALUES(tipo_identificacion),
-         numero_identificacion = VALUES(numero_identificacion),
-         direccion = VALUES(direccion),
-         telefono = VALUES(telefono),
-         updated_at = CURRENT_TIMESTAMP`,
-      [userId, pn, sn, pa, sa, tipo, num, dir, tel]
-    );
+    await conn.query('CALL sp_user_profiles_upsert(?, ?, ?, ?, ?, ?, ?, ?, ?)', [userId, pn, sn, pa, sa, tipo, num, dir, tel]);
     await logSecurity('profile_update', (req.session as any)?.username ?? null, clientIp(req), { user_id: userId });
     res.json({ message: 'Perfil actualizado' });
   } catch (e: any) {
@@ -1377,14 +1155,10 @@ app.post('/api/me/password-change', requireAuth, async (req: express.Request, re
   const ip = clientIp(req);
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT username, email, password_hash FROM users WHERE id = ? LIMIT 1',
-      [userId]
-    );
-    if ((rows as any[]).length === 0) {
+    const u = await callFirst<any>(conn, 'sp_users_get_password_hash', [userId]);
+    if (!u) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    const u = (rows as any[])[0] as any;
     const ok = await bcrypt.compare(current_password, u.password_hash);
     if (!ok) {
       await logSecurity('password_change_failed', (req.session as any)?.username ?? null, ip, { reason: 'bad_current' });
@@ -1396,7 +1170,7 @@ app.post('/api/me/password-change', requireAuth, async (req: express.Request, re
       return res.status(400).json({ error: pwdError });
     }
     const hash = await bcrypt.hash(new_password, 10);
-    await conn.execute('UPDATE users SET password_hash = ?, password_changed_at = CURRENT_TIMESTAMP WHERE id = ?', [hash, userId]);
+    await conn.query('CALL sp_users_update_password(?, ?)', [userId, hash]);
     await logSecurity('password_change_success', (req.session as any)?.username ?? null, ip, {});
     res.json({ message: 'Contraseña actualizada' });
   } catch (e: any) {
@@ -1416,15 +1190,11 @@ app.post('/api/me/status', requireAuth, async (req: express.Request, res: expres
   }
   const conn = await pool.getConnection();
   try {
-    const [srows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
-      [desired]
-    );
-    if ((srows as any[]).length === 0) {
+    const srow = await callFirst<any>(conn, 'sp_statuses_get_id_by_name', [desired]);
+    if (!srow) {
       return res.status(400).json({ error: 'Estado no disponible' });
     }
-    const statusId = Number((srows as any[])[0].id);
-    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [statusId, userId]);
+    await conn.query('CALL sp_users_update_status_by_name(?, ?)', [userId, desired]);
     await logSecurity('self_status_update', (req.session as any)?.username ?? null, clientIp(req), { status: desired });
     if (desired === 'Deshabilitado') {
       (req.session as any).destroy(() => {
@@ -1448,10 +1218,7 @@ app.get('/api/me/meters', requireAuth, async (req: express.Request, res: express
   const userId = (req.session as any).userId as number;
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, name, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? ORDER BY COALESCE(name, card_number) ASC',
-      [userId]
-    );
+    const rows = await callAll<any>(conn, 'sp_energy_cards_list_by_user', [userId]);
     res.json({ meters: rows });
   } catch (e) {
     console.error(e);
@@ -1476,19 +1243,13 @@ app.post('/api/me/meters', requireAuth, async (req: express.Request, res: expres
     await conn.beginTransaction();
 
     // If the meter exists and is released (user_id IS NULL), claim it.
-    const [found] = await conn.execute<RowDataPacket[]>(
-      'SELECT id, user_id, card_number, current_balance, current_kwh, last_recharge, released FROM energy_cards WHERE card_number = ? LIMIT 1',
-      [card]
-    );
+    const foundRow = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
 
-    if ((found as any[]).length > 0) {
-      const r = (found as any[])[0] as any;
+    if (foundRow) {
+      const r = foundRow as any;
       if (r.user_id == null) {
         // Claim released meter by linking to this user and clearing release flags
-        await conn.execute(
-          'UPDATE energy_cards SET user_id = ?, name = COALESCE(?, name), released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
-          [userId, meterName, Number(r.id)]
-        );
+        await conn.query('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [Number(r.id), userId, meterName]);
         await logSecurity('meter_claimed', username, ip, { card_number: card, new_user_id: userId });
       } else {
         await conn.rollback();
@@ -1496,17 +1257,11 @@ app.post('/api/me/meters', requireAuth, async (req: express.Request, res: expres
       }
     } else {
       // Create a new meter record
-      await conn.execute(
-        'INSERT INTO energy_cards (user_id, card_number, name, current_balance, current_kwh) VALUES (?, ?, ?, 0, 0)',
-        [userId, card, meterName]
-      );
+      await conn.query('CALL sp_energy_cards_insert(?, ?, ?)', [userId, card, meterName]);
       await logSecurity('meter_added', username, ip, { card_number: card, user_id: userId });
     }
 
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, name, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
-      [userId, card]
-    );
+    const rows = await callAll<any>(conn, 'sp_energy_cards_get_by_user_and_card', [userId, card]);
 
     await conn.commit();
 
@@ -1534,19 +1289,11 @@ app.delete('/api/me/meters/:card_number', requireAuth, async (req: express.Reque
 
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
-      [userId, card]
-    );
-    if ((rows as any[]).length === 0) {
+    const resUpd = await callAll<any>(conn, 'sp_energy_cards_release_by_user_and_card', [userId, card, userId]);
+    const affected = Number((resUpd[0] || {}).affected_rows ?? 0);
+    if (affected === 0) {
       return res.status(404).json({ error: 'Medidor no encontrado' });
     }
-    const id = Number((rows as any[])[0].id);
-
-    await conn.execute(
-      'UPDATE energy_cards SET user_id = NULL, released = 1, released_by_user_id = ?, released_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [userId, id]
-    );
 
     await logSecurity('meter_released', username, ip, { card_number: card, user_id: userId });
     return res.json({ message: 'Medidor liberado' });
@@ -1585,26 +1332,16 @@ app.patch('/api/me/meters/:card_number', requireAuth, async (req: express.Reques
 
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT id FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
-      [userId, card]
-    );
-    if ((rows as any[]).length === 0) {
+    const upd = await callAll<any>(conn, 'sp_energy_cards_update_name_by_user_and_card', [userId, card, name]);
+    const affected = Number((upd[0] || {}).affected_rows ?? 0);
+    if (affected === 0) {
       return res.status(404).json({ error: 'Medidor no encontrado' });
     }
 
-    await conn.execute(
-      'UPDATE energy_cards SET name = ? WHERE user_id = ? AND card_number = ?',
-      [name, userId, card]
-    );
-
-    const [out] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, name, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
-      [userId, card]
-    );
+    const out = await callFirst<any>(conn, 'sp_energy_cards_get_by_user_and_card', [userId, card]);
 
     await logSecurity('meter_renamed', username, ip, { card_number: card, name });
-    return res.json({ meter: (out as any[])[0] });
+    return res.json({ meter: out });
   } catch (e: any) {
     console.error(e);
     return res.status(500).json({ error: 'No se pudo actualizar el nombre del medidor' });
