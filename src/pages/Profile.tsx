@@ -35,6 +35,8 @@ export default function ProfilePage() {
     telefono: '',
   });
 
+  const [isFirstFill, setIsFirstFill] = useState(false);
+
   // UI/flow control for one-time document change
   const [docEditEnabled, setDocEditEnabled] = useState(false);
   const [docChangeUsed, setDocChangeUsed] = useState(false);
@@ -68,6 +70,7 @@ export default function ProfilePage() {
             numero_identificacion: p.numero_identificacion || '',
           });
         }
+        setIsFirstFill(!(res.personal_data_filled === true));
       } catch (e: any) {
         setError(e?.response?.data?.error || e?.message || 'Error al cargar el perfil');
       }
@@ -100,9 +103,10 @@ export default function ProfilePage() {
       return;
     }
 
-    const changedDoc =
+    const changedDoc = !isFirstFill && (
       form.tipo_identificacion !== originalDoc.tipo_identificacion ||
-      form.numero_identificacion.trim() !== originalDoc.numero_identificacion.trim();
+      form.numero_identificacion.trim() !== originalDoc.numero_identificacion.trim()
+    );
 
     if (changedDoc && docChangeUsed) {
       setError('Ya usó su única oportunidad de cambio de documento. Para cambios de pasaporte, contacte a soporte.');
@@ -127,6 +131,15 @@ export default function ProfilePage() {
         try { localStorage.setItem('energo-doc-change-used', '1'); } catch {}
         setDocChangeUsed(true);
         setDocEditEnabled(false);
+        setOriginalDoc({
+          tipo_identificacion: form.tipo_identificacion,
+          numero_identificacion: form.numero_identificacion.trim(),
+        });
+      }
+
+      const becameFilled = Boolean(form.direccion.trim() && form.telefono.trim());
+      if (isFirstFill && becameFilled) {
+        setIsFirstFill(false);
         setOriginalDoc({
           tipo_identificacion: form.tipo_identificacion,
           numero_identificacion: form.numero_identificacion.trim(),
@@ -176,14 +189,14 @@ export default function ProfilePage() {
               onChange={(e) => set('primer_nombre', e.target.value)}
               required
               fullWidth
-              disabled
+              disabled={!isFirstFill}
             />
             <TextField
               label="Segundo nombre"
               value={form.segundo_nombre}
               onChange={(e) => set('segundo_nombre', e.target.value)}
               fullWidth
-              disabled
+              disabled={!isFirstFill}
             />
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -193,14 +206,14 @@ export default function ProfilePage() {
               onChange={(e) => set('primer_apellido', e.target.value)}
               required
               fullWidth
-              disabled
+              disabled={!isFirstFill}
             />
             <TextField
               label="Segundo apellido"
               value={form.segundo_apellido}
               onChange={(e) => set('segundo_apellido', e.target.value)}
               fullWidth
-              disabled
+              disabled={!isFirstFill}
             />
           </Stack>
           <Stack spacing={1}>
@@ -217,7 +230,7 @@ export default function ProfilePage() {
                   label="Tipo de identificación"
                   value={form.tipo_identificacion}
                   onChange={(e) => set('tipo_identificacion', e.target.value)}
-                  disabled={!docEditEnabled || docChangeUsed}
+                  disabled={isFirstFill ? false : (!docEditEnabled || docChangeUsed)}
                 >
                   {DOC_TYPES.map((t) => (
                     <MenuItem key={t} value={t}>{t}</MenuItem>
@@ -230,7 +243,7 @@ export default function ProfilePage() {
                 onChange={(e) => set('numero_identificacion', e.target.value)}
                 required
                 fullWidth
-                disabled={!docEditEnabled || docChangeUsed}
+                disabled={isFirstFill ? false : (!docEditEnabled || docChangeUsed)}
               />
             </Stack>
           </Stack>
@@ -250,18 +263,20 @@ export default function ProfilePage() {
             <Button type="submit" variant="contained" disabled={saving}>
               {saving ? 'Guardando…' : 'Guardar cambios'}
             </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              disabled={saving || docChangeUsed}
-              onClick={() => {
-                if (docChangeUsed) return;
-                const ok = window.confirm('Podrá cambiar su documento solo una vez. Para cambios de número de pasaporte, contacte a soporte. ¿Desea habilitar la edición de documento ahora?');
-                if (ok) setDocEditEnabled(true);
-              }}
-            >
-              {docChangeUsed ? 'Cambio de documento usado' : (docEditEnabled ? 'Editando documento…' : 'Cambiar documento')}
-            </Button>
+            {!isFirstFill && (
+              <Button
+                variant="contained"
+                color="primary"
+                disabled={saving || docChangeUsed}
+                onClick={() => {
+                  if (docChangeUsed) return;
+                  const ok = window.confirm('Podrá cambiar su documento solo una vez. Para cambios de número de pasaporte, contacte a soporte. ¿Desea habilitar la edición de documento ahora?');
+                  if (ok) setDocEditEnabled(true);
+                }}
+              >
+                {docChangeUsed ? 'Cambio de documento usado' : (docEditEnabled ? 'Editando documento…' : 'Cambiar documento')}
+              </Button>
+            )}
             <Button color="secondary" onClick={() => window.history.back()} disabled={saving}>
               Cancelar
             </Button>

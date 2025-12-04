@@ -1078,7 +1078,12 @@ app.get('/api/me/profile', requireAuth, async (req: express.Request, res: expres
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
     const profile = await callFirst<any>(conn, 'sp_user_profiles_get_by_user', [userId]);
-    res.json({ username: String(u.username), email: String(u.email), profile });
+
+    // DB flag: whether personal data was fully filled at least once
+    const [flagRows]: any = await conn.query('SELECT personal_data_filled FROM user_flags WHERE user_id = ? LIMIT 1', [userId]);
+    const personal_data_filled = Array.isArray(flagRows) && flagRows.length ? Number(flagRows[0].personal_data_filled) === 1 : false;
+
+    res.json({ username: String(u.username), email: String(u.email), profile, personal_data_filled });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'No se pudo cargar el perfil' });
@@ -1159,6 +1164,17 @@ app.put('/api/me/profile', requireAuth, async (req: express.Request, res: expres
     }
 
     await conn.query('CALL sp_user_profiles_upsert(?, ?, ?, ?, ?, ?, ?, ?, ?)', [userId, pn, sn, pa, sa, tipo, num, dir, tel]);
+
+    // If address and phone are provided, mark the DB flag as filled (idempotent; keeps first filled_at)
+    const filledNow = !!(dir && tel);
+    if (filledNow) {
+      await conn.query(
+        'INSERT INTO user_flags (user_id, personal_data_filled, filled_at) VALUES (?, 1, CURRENT_TIMESTAMP) ' +
+        'ON DUPLICATE KEY UPDATE personal_data_filled = 1, filled_at = IF(filled_at IS NULL, VALUES(filled_at), filled_at)',
+        [userId]
+      );
+    }
+
     await conn.commit();
 
     await logSecurity(docChanged ? 'profile_document_changed' : 'profile_update', (req.session as any)?.username ?? null, clientIp(req), { user_id: userId });

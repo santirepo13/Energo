@@ -78,16 +78,14 @@ function App() {
       try {
         const pr = await meGetProfile()
         if (!mounted) return
-        const p = pr.profile
-        const incomplete = !p || !p.direccion || !p.telefono
-        let shown = false
-        try { shown = localStorage.getItem('energo-profile-prompt-shown') === '1' } catch {}
-        if (incomplete && !shown) setShowProfilePrompt(true)
+        const filled = pr.personal_data_filled === true
+        if (!filled) setShowProfilePrompt(true)
       } catch {}
     })()
     const onMsg = (e: MessageEvent) => {
       if ((e as any)?.data === 'profile-updated') {
         setWaitingForProfile(false)
+        setShowProfilePrompt(false)
       }
     }
     window.addEventListener('message', onMsg)
@@ -209,7 +207,6 @@ function App() {
                 <Button
                   variant="contained"
                   onClick={() => {
-                    try { localStorage.setItem('energo-profile-prompt-shown', '1') } catch {}
                     window.open('/me', '_blank', 'noopener')
                     setShowProfilePrompt(false)
                     setWaitingForProfile(true)
