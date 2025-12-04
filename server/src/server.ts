@@ -18,6 +18,7 @@ import session from 'express-session';
 import bcrypt from 'bcryptjs';
 import { createPool, Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import crypto from 'crypto';
+import fs from 'fs/promises';
 
 const app = express();
 // Hide Express signature header
@@ -55,6 +56,56 @@ const __origGetConnection = (pool as any).getConnection.bind(pool);
   } catch (_e) { /* ignore */ }
   return conn;
 };
+
+// Apply SP migrations from SQL files at startup to fix collation issues inside routines
+async function execSqlFile(conn: any, filePath: string) {
+  try {
+    const sql = await fs.readFile(filePath, 'utf8');
+    const cleaned = sql
+      .replace(/\r/g, '')
+      .replace(/^\s*DELIMITER\s+\$\$\s*$/gmi, '')
+      .replace(/^\s*DELIMITER\s*;\s*$/gmi, '');
+    const chunks = cleaned.split('$$').map(s => s.trim()).filter(Boolean);
+    for (let chunk of chunks) {
+      chunk = chunk.replace(/^\s*--.*$/gmi, '').trim();
+      if (!chunk) continue;
+      try {
+        await conn.query(chunk);
+      } catch (e: any) {
+        const msg = String(e?.sqlMessage || e?.message || '');
+        if (/DROP\s+PROCEDURE/i.test(chunk) && /does not exist/i.test(msg)) {
+          continue;
+        }
+        throw e;
+      }
+    }
+  } catch (e) {
+    throw e;
+  }
+}
+
+async function applySpMigrations() {
+  try {
+    const conn = await pool.getConnection();
+    try {
+      // Ensure connection collation
+      await conn.query("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci");
+      await conn.query("SET collation_connection = 'utf8mb4_general_ci'");
+
+      // Apply base SPs then collation-safe fixes
+      const base = path.resolve(__dirname, '../db/migrations/20251204_stored_procedures.sql');
+      const fix = path.resolve(__dirname, '../db/migrations/20251204_stored_procedures_collation_fix.sql');
+      await execSqlFile(conn, base);
+      await execSqlFile(conn, fix);
+
+      console.log('Stored procedures ensured with collation fix');
+    } finally {
+      conn.release();
+    }
+  } catch (e: any) {
+    console.error('Failed to apply stored procedure migrations', e?.message || e);
+  }
+}
 
 // Stored procedure helpers (MariaDB 10.x compatible)
 // Builds placeholders and unwraps the first resultset of CALL responses.
@@ -138,6 +189,7 @@ async function testDbConnection() {
   }
 }
 void testDbConnection();
+void applySpMigrations();
 
 // Security headers: baseline CSP and anti-clickjacking for all responses (incl. CORS preflight)
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
