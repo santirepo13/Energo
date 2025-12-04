@@ -21,6 +21,11 @@ import { createPool, Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise
 const app = express();
 // Hide Express signature header
 app.disable('x-powered-by');
+// Hide server software/version info by overriding the "Server" header
+app.use((_: express.Request, res: express.Response, next: express.NextFunction) => {
+  res.setHeader('Server', 'Energo');
+  next();
+});
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173';
