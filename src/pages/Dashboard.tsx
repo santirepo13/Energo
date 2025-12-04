@@ -48,8 +48,8 @@ function formatCOP(n: number) {
 }
 
 function formatCOPCost(n: number) {
-  // Show exactly two decimals and explicit COP, e.g. "861.88 COP"
-  return `${Number(n).toFixed(2)} COP`;
+  // Show raw price (no rounding); users handle rounding themselves
+  return `${n} COP`;
 }
 
 function formatKwh(n: number) {

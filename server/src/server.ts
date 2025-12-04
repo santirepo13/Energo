@@ -1137,7 +1137,7 @@ app.post('/api/admin/kwh-price', requireAuth, requireAdmin, async (req: express.
     // Read old cost using existing helper (uses the provided connection)
     const oldCost = await getCostPerKwh(conn);
 
-    const newPrice = Number(Number(price).toFixed(2));
+    const newPrice = Number(price);
 
     // Upsert into settings table (key is unique)
     await conn.execute(
