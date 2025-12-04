@@ -35,12 +35,14 @@ export type DashboardResponse = {
   // Back-compat: first card (may be null)
   card: {
     card_number: string;
+    name?: string | null;
     current_balance: number;
     current_kwh: number;
   } | null;
   // New: full list of meters for the user
   cards?: Array<{
     card_number: string;
+    name?: string | null;
     current_balance: number;
     current_kwh: number;
   }>;
@@ -259,6 +261,7 @@ export async function mockPausaVerify(username: string) {
 
 export type UserMeter = {
   card_number: string;
+  name?: string | null;
   current_balance: number;
   current_kwh: number;
   last_recharge: string | null;
@@ -269,8 +272,10 @@ export async function meListMeters() {
   return res.data as { meters: UserMeter[] };
 }
 
-export async function meAddMeter(card_number: string) {
-  const res = await api.post('/me/meters', { card_number });
+export async function meAddMeter(card_number: string, name?: string) {
+  const body: any = { card_number };
+  if (name && name.trim()) body.name = name.trim();
+  const res = await api.post('/me/meters', body);
   return res.data as { meter: UserMeter };
 }
 

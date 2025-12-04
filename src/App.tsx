@@ -123,8 +123,8 @@ function App() {
                 <MenuItem onClick={() => { setProfileAnchor(null); navigate('/me'); }}>
                   Datos personales
                 </MenuItem>
-                <MenuItem onClick={() => { setProfileAnchor(null); navigate('/me/seguridad'); }}>
-                  Seguridad
+                <MenuItem onClick={() => { setProfileAnchor(null); navigate('/me/ajustes'); }}>
+                  Ajustes
                 </MenuItem>
                 <Divider />
                 <MenuItem onClick={() => { setProfileAnchor(null); handleLogout(); }}>
@@ -146,6 +146,7 @@ function App() {
           <Route path="/audit/employees" element={<AuditEmployeesPage />} />
           <Route path="/me" element={<ProfilePage />} />
           <Route path="/me/seguridad" element={<SecurityPage />} />
+          <Route path="/me/ajustes" element={<SecurityPage />} />
           <Route path="/reactivar" element={<PausaRestorePage />} />
         </Routes>
       </Container>

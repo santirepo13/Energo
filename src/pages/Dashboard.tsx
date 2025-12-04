@@ -401,7 +401,7 @@ export default function Dashboard() {
             {cards.map((c) => (
               <Chip
                 key={c.card_number}
-                label={c.card_number}
+                label={c.name ?? c.card_number}
                 color={selectedCardNumber === c.card_number ? 'primary' : 'default'}
                 variant={selectedCardNumber === c.card_number ? 'filled' : 'outlined'}
                 onClick={() => setSelectedCardNumber(c.card_number)}
@@ -411,24 +411,7 @@ export default function Dashboard() {
             ))}
           </Box>
         )}
-        {showCardAndRecharge && (
-          <>
-            {meterErr && <Alert severity="error" sx={{ ml: 2 }}>{meterErr}</Alert>}
-            {meterMsg && <Alert severity="success" sx={{ ml: 2 }}>{meterMsg}</Alert>}
-            <Stack component="form" onSubmit={handleAddMeter} direction="row" spacing={1} sx={{ ml: 2 }}>
-              <TextField
-                label="Agregar medidor"
-                value={newMeterSerial}
-                onChange={(e) => setNewMeterSerial(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                size="small"
-                placeholder="ABC123456"
-              />
-              <Button type="submit" variant="contained" disabled={addingMeter}>
-                {addingMeter ? 'Agregando…' : 'Agregar'}
-              </Button>
-            </Stack>
-          </>
-        )}
+        {showCardAndRecharge && null}
       </Stack>
 
       {isPaused && showCardAndRecharge && (
@@ -451,10 +434,10 @@ export default function Dashboard() {
           <Card>
             <CardContent>
               <Typography variant="overline" color="text.secondary">
-                Serial de medidor
+                Medidor
               </Typography>
               <Typography variant="h6" sx={{ mb: 2 }}>
-                {card.card_number}
+                {card.name ?? card.card_number}
               </Typography>
 
               <Divider sx={{ mb: 2 }} />

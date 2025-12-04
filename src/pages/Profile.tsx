@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -14,7 +13,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { meGetProfile, meUpdateProfile, meListMeters, meAddMeter, meReleaseMeter, type MeProfileResponse, type UpdateProfileRequest, type UserMeter } from '../api/client';
+import { meGetProfile, meUpdateProfile, type MeProfileResponse, type UpdateProfileRequest } from '../api/client';
 
 const DOC_TYPES = ['CC','CE','Pasaporte','PEP','RIF'] as const;
 
@@ -35,14 +34,6 @@ export default function ProfilePage() {
     telefono: '',
   });
 
-  // Meters state
-  const [meters, setMeters] = useState<UserMeter[]>([]);
-  const [metersLoading, setMetersLoading] = useState(true);
-  const [metersError, setMetersError] = useState<string | null>(null);
-  const [metersSuccess, setMetersSuccess] = useState<string | null>(null);
-  const [newMeter, setNewMeter] = useState('');
-  const [addingMeter, setAddingMeter] = useState(false);
-  const [releasing, setReleasing] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -68,15 +59,8 @@ export default function ProfilePage() {
         setError(e?.response?.data?.error || e?.message || 'Error al cargar el perfil');
       }
 
-      try {
-        const mr = await meListMeters();
-        if (mounted) setMeters(mr.meters || []);
-      } catch (e: any) {
-        if (mounted) setMetersError(e?.response?.data?.error || e?.message || 'Error al cargar medidores');
-      } finally {
-        if (mounted) setMetersLoading(false);
-        if (mounted) setLoading(false);
-      }
+      // End loading after profile fetch
+      if (mounted) setLoading(false);
     })();
     return () => { mounted = false; }
   }, []);
@@ -115,50 +99,7 @@ export default function ProfilePage() {
     }
   }
   
-    async function handleAddMeter(e: React.FormEvent) {
-      e.preventDefault();
-      setMetersError(null);
-      setMetersSuccess(null);
-      const serial = newMeter.trim();
-      if (!serial) {
-        setMetersError('Ingrese un serial de medidor');
-        return;
-      }
-      setAddingMeter(true);
-      try {
-        const res = await meAddMeter(serial);
-        setMeters((prev) => {
-          const exists = prev.some((m) => m.card_number === res.meter.card_number);
-          return exists ? prev : [res.meter, ...prev];
-        });
-        setMetersSuccess('Medidor agregado');
-        setNewMeter('');
-        window.dispatchEvent(new Event('auth-changed'));
-      } catch (e: any) {
-        setMetersError(e?.response?.data?.error || e?.message || 'No se pudo agregar el medidor');
-      } finally {
-        setAddingMeter(false);
-      }
-    }
 
-  async function handleReleaseMeter(card: string) {
-    setMetersError(null);
-    setMetersSuccess(null);
-    const serial = (card ?? '').toString().trim();
-    if (!serial) return;
-    if (!window.confirm('¿Eliminar de su cuenta este medidor? Podrá vincularse a otra cuenta.')) return;
-    setReleasing(serial);
-    try {
-      await meReleaseMeter(serial);
-      setMeters((prev) => prev.filter((m) => m.card_number !== serial));
-      setMetersSuccess('Medidor liberado');
-      window.dispatchEvent(new Event('auth-changed'));
-    } catch (e: any) {
-      setMetersError(e?.response?.data?.error || e?.message || 'No se pudo liberar el medidor');
-    } finally {
-      setReleasing(null);
-    }
-  }
 
   if (loading) {
     return (
@@ -256,39 +197,6 @@ export default function ProfilePage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
-        <Stack spacing={2} component="form" onSubmit={handleAddMeter}>
-          <Typography variant="h6">Medidores</Typography>
-          {metersError && <Alert severity="error">{metersError}</Alert>}
-          {metersSuccess && <Alert severity="success">{metersSuccess}</Alert>}
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              label="Serial de medidor"
-              value={newMeter}
-              onChange={(e) => setNewMeter(e.target.value.replace(/\s+/g, '').toUpperCase())}
-              placeholder="ABC123456"
-              required
-              fullWidth
-            />
-            <Button type="submit" variant="contained" disabled={addingMeter}>
-              {addingMeter ? 'Agregando…' : 'Agregar medidor'}
-            </Button>
-          </Stack>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            {metersLoading && <Typography>Cargando medidores…</Typography>}
-            {!metersLoading && meters.map((m) => (
-              <Chip
-                key={m.card_number}
-                label={m.card_number + (releasing === m.card_number ? ' (eliminando...)' : '')}
-                onDelete={() => handleReleaseMeter(m.card_number)}
-              />
-            ))}
-            {!metersLoading && meters.length === 0 && (
-              <Typography color="text.secondary">Sin medidores registrados.</Typography>
-            )}
-          </Stack>
-        </Stack>
-      </Paper>
     </Stack>
   );
 }

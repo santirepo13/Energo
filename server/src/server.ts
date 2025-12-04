@@ -779,7 +779,7 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
     } else {
       // Regular user: own cards, own history, and hide logs
       const [cardRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? ORDER BY card_number ASC',
+        'SELECT card_number, name, current_balance, current_kwh FROM energy_cards WHERE user_id = ? ORDER BY COALESCE(name, card_number) ASC',
         [userId]
       );
       cards = cardRows as any[];
@@ -1359,7 +1359,7 @@ app.get('/api/me/meters', requireAuth, async (req: express.Request, res: express
   const conn = await pool.getConnection();
   try {
     const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? ORDER BY card_number ASC',
+      'SELECT card_number, name, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? ORDER BY COALESCE(name, card_number) ASC',
       [userId]
     );
     res.json({ meters: rows });
@@ -1375,7 +1375,8 @@ app.post('/api/me/meters', requireAuth, async (req: express.Request, res: expres
   const userId = (req.session as any).userId as number;
   const username = (req.session as any).username as string | null;
   const ip = clientIp(req);
-  const { card_number } = req.body as { card_number?: string };
+  const { card_number, name } = req.body as { card_number?: string; name?: string };
+  const meterName = (typeof name === 'string' && name.trim() !== '') ? name.trim().slice(0, 100) : null;
   const card = (typeof card_number === 'string' && card_number.trim() !== '') ? card_number.trim() : null;
   if (!card) {
     return res.status(400).json({ error: 'Debe enviar un número de medidor' });
@@ -1395,8 +1396,8 @@ app.post('/api/me/meters', requireAuth, async (req: express.Request, res: expres
       if (r.user_id == null) {
         // Claim released meter by linking to this user and clearing release flags
         await conn.execute(
-          'UPDATE energy_cards SET user_id = ?, released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
-          [userId, Number(r.id)]
+          'UPDATE energy_cards SET user_id = ?, name = COALESCE(?, name), released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
+          [userId, meterName, Number(r.id)]
         );
         await logSecurity('meter_claimed', username, ip, { card_number: card, new_user_id: userId });
       } else {
@@ -1406,14 +1407,14 @@ app.post('/api/me/meters', requireAuth, async (req: express.Request, res: expres
     } else {
       // Create a new meter record
       await conn.execute(
-        'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
-        [userId, card]
+        'INSERT INTO energy_cards (user_id, card_number, name, current_balance, current_kwh) VALUES (?, ?, ?, 0, 0)',
+        [userId, card, meterName]
       );
       await logSecurity('meter_added', username, ip, { card_number: card, user_id: userId });
     }
 
     const [rows] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
+      'SELECT card_number, name, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
       [userId, card]
     );
 
