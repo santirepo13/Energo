@@ -176,4 +176,21 @@ BEGIN
   ORDER BY u.created_at DESC;
 END $$
 
+DROP PROCEDURE IF EXISTS sp_energy_cards_update_balance $$
+CREATE PROCEDURE sp_energy_cards_update_balance(
+  IN p_user_id INT,
+  IN p_card_number VARCHAR(50),
+  IN p_new_balance DECIMAL(10,2),
+  IN p_new_kwh DECIMAL(10,2)
+)
+BEGIN
+  UPDATE energy_cards
+  SET current_balance = p_new_balance,
+      current_kwh    = p_new_kwh,
+      last_recharge  = CURRENT_TIMESTAMP
+  WHERE user_id = p_user_id
+    AND card_number = CONVERT(p_card_number USING utf8mb4) COLLATE utf8mb4_general_ci;
+  SELECT ROW_COUNT() AS affected_rows;
+END $$
+
 DELIMITER ;

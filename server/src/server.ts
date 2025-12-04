@@ -235,7 +235,7 @@ app.use(
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   let p = req.path || '';
   try { p = decodeURIComponent(p); } catch { /* ignore malformed encodings */ }
-  // Allow /.well-known for ACME challenges explicitly
+ 
   if (p.startsWith('/.well-known/')) return next();
   // Block any hidden path segment such as /.hg, /.git, /.env, /.svn, etc.
   if (/(?:^|\/)\.[^/]/.test(p)) {
