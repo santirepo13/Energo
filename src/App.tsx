@@ -9,6 +9,7 @@ import AdminUsersPage from './pages/AdminUsers.tsx'
 import AuditEmployeesPage from './pages/AuditEmployees.tsx'
 import ProfilePage from './pages/Profile.tsx'
 import SecurityPage from './pages/Security.tsx'
+import PausaRestorePage from './pages/PausaRestore.tsx'
 import { useEffect, useState, useMemo } from 'react'
 import { getDashboard, api } from './api/client'
 import type { UserInfo } from './api/client'
@@ -83,7 +84,7 @@ function App() {
       <AppBar position="static" color="primary">
         <Toolbar>
           <img src={logo} alt="Energo" style={{ height: 32, marginRight: 12, borderRadius: 4 }} />
-          <Typography variant="h6" component="div">
+          <Typography variant="h6" component={Link} to="/dashboard" sx={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
             Energo
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
@@ -145,6 +146,7 @@ function App() {
           <Route path="/audit/employees" element={<AuditEmployeesPage />} />
           <Route path="/me" element={<ProfilePage />} />
           <Route path="/me/seguridad" element={<SecurityPage />} />
+          <Route path="/reactivar" element={<PausaRestorePage />} />
         </Routes>
       </Container>
     </ThemeProvider>

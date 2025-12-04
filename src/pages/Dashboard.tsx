@@ -35,7 +35,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
 import logo from '../assets/logo.png';
 import type { DashboardResponse, AuditMetrics } from '../api/client';
-import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
+import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice, meAddMeter, meReleaseMeter } from '../api/client';
 
 const currencyCOP = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -86,6 +86,16 @@ export default function Dashboard() {
   const showHistory = !isAudit; // admin + regular users
   const showLogs = isAudit;     // only auditors
 
+  // Meters
+  const cards = data?.cards ?? (data?.card ? [data.card] : []);
+  const [selectedCardNumber, setSelectedCardNumber] = useState<string | null>(null);
+
+  const [newMeterSerial, setNewMeterSerial] = useState<string>('');
+  const [addingMeter, setAddingMeter] = useState(false);
+  const [releasingMeter, setReleasingMeter] = useState(false);
+  const [meterErr, setMeterErr] = useState<string | null>(null);
+  const [meterMsg, setMeterMsg] = useState<string | null>(null);
+  
 
   // Audit state
   const [auditMetrics, setAuditMetrics] = useState<AuditMetrics | null>(null);
@@ -123,6 +133,14 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Initialize selected meter once dashboard loads
+  useEffect(() => {
+    if (!selectedCardNumber) {
+      const first = (data?.cards && data.cards[0]?.card_number) || (data?.card?.card_number ?? null);
+      if (first) setSelectedCardNumber(first);
+    }
+  }, [data, selectedCardNumber]);
+
   const equivalent = useMemo(() => {
     if (mode === 'cop') {
       const v = Number(cop);
@@ -141,7 +159,7 @@ export default function Dashboard() {
     setSubmitError(null);
     setPin(null);
     try {
-      let body: { amount?: number; kwh?: number } = {};
+      let body: { amount?: number; kwh?: number; card_number?: string } = {};
       if (mode === 'cop') {
         const v = Number(cop);
         if (!isFinite(v) || v <= 0) throw new Error('Ingrese un valor válido en pesos (COP)');
@@ -151,21 +169,30 @@ export default function Dashboard() {
         if (!isFinite(v) || v <= 0) throw new Error('Ingrese un valor válido en kWh');
         body.kwh = Number(v.toFixed(2));
       }
+      if (card?.card_number) {
+        body.card_number = card.card_number;
+      }
       const res = await recharge(body);
       setPin(res.pin_code);
 
       // Optimistically update local state
       setData((prev) => {
         if (!prev) return prev;
+        const updatedCards = prev.cards
+          ? prev.cards.map((c) =>
+              c.card_number === res.card_number
+                ? { ...c, current_balance: res.current_balance, current_kwh: res.current_kwh }
+                : c
+            )
+          : prev.cards;
+        const updatedCard =
+          prev.card && prev.card.card_number === res.card_number
+            ? { ...prev.card, current_balance: res.current_balance, current_kwh: res.current_kwh }
+            : prev.card;
         const next: DashboardResponse = {
           ...prev,
-          card: prev.card
-            ? {
-                ...prev.card,
-                current_balance: res.current_balance,
-                current_kwh: res.current_kwh,
-              }
-            : prev.card,
+          card: updatedCard,
+          cards: updatedCards ?? prev.cards,
           recharge_history: [
             {
               pin_code: res.pin_code,
@@ -222,6 +249,60 @@ export default function Dashboard() {
     }
   }
 
+  // Add a new meter from dashboard
+  async function handleAddMeter(e: React.FormEvent) {
+    e.preventDefault();
+    setMeterErr(null);
+    setMeterMsg(null);
+    const serial = newMeterSerial.trim();
+    if (!serial) {
+      setMeterErr('Ingrese un serial de medidor');
+      return;
+    }
+    setAddingMeter(true);
+    try {
+      const res = await meAddMeter(serial);
+      setData((prev) => {
+        if (!prev) return prev;
+        const exists = (prev.cards ?? []).some((c) => c.card_number === res.meter.card_number);
+        const nextCards = exists ? (prev.cards ?? []) : [res.meter, ...(prev.cards ?? [])];
+        return { ...prev, cards: nextCards };
+      });
+      setSelectedCardNumber(res.meter.card_number);
+      setNewMeterSerial('');
+      setMeterMsg('Medidor agregado');
+    } catch (e: any) {
+      setMeterErr(e?.response?.data?.error || e?.message || 'No se pudo agregar el medidor');
+    } finally {
+      setAddingMeter(false);
+    }
+  }
+
+  // Release currently selected meter (unlink from account)
+  async function handleReleaseSelected() {
+    setMeterErr(null);
+    setMeterMsg(null);
+    const serial = selectedCardNumber?.trim() || '';
+    if (!serial) return;
+    if (!window.confirm('¿Eliminar de su cuenta este medidor? Podrá vincularse a otra cuenta.')) return;
+    setReleasingMeter(true);
+    try {
+      await meReleaseMeter(serial);
+      setData((prev) => {
+        if (!prev) return prev;
+        const nextCards = (prev.cards ?? []).filter((c) => c.card_number !== serial);
+        const nextCard = nextCards.length > 0 ? nextCards[0] : null;
+        return { ...prev, cards: nextCards, card: nextCard };
+      });
+      setSelectedCardNumber(null);
+      setMeterMsg('Medidor liberado');
+    } catch (e: any) {
+      setMeterErr(e?.response?.data?.error || e?.message || 'No se pudo liberar el medidor');
+    } finally {
+      setReleasingMeter(false);
+    }
+  }
+  
   if (loading) {
     return (
       <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
@@ -234,7 +315,10 @@ export default function Dashboard() {
     return <Alert severity="error">{error}</Alert>;
   }
 
-  const card = data?.card ?? null;
+  const card =
+    (selectedCardNumber
+      ? cards.find((c) => c.card_number === selectedCardNumber) ?? cards[0]
+      : cards[0]) ?? null;
 
   return (
     <Stack spacing={3}>
@@ -311,6 +395,40 @@ export default function Dashboard() {
             sx={{ ml: 1 }}
           />
         )}
+        {showCardAndRecharge && cards.length > 0 && (
+          <Box sx={{ ml: 2, display: 'flex', alignItems: 'center', gap: 1, overflowX: 'auto', py: 0.5 }}>
+            <Typography variant="body2" color="text.secondary">Medidores:</Typography>
+            {cards.map((c) => (
+              <Chip
+                key={c.card_number}
+                label={c.card_number}
+                color={selectedCardNumber === c.card_number ? 'primary' : 'default'}
+                variant={selectedCardNumber === c.card_number ? 'filled' : 'outlined'}
+                onClick={() => setSelectedCardNumber(c.card_number)}
+                clickable
+                sx={{ flex: '0 0 auto' }}
+              />
+            ))}
+          </Box>
+        )}
+        {showCardAndRecharge && (
+          <>
+            {meterErr && <Alert severity="error" sx={{ ml: 2 }}>{meterErr}</Alert>}
+            {meterMsg && <Alert severity="success" sx={{ ml: 2 }}>{meterMsg}</Alert>}
+            <Stack component="form" onSubmit={handleAddMeter} direction="row" spacing={1} sx={{ ml: 2 }}>
+              <TextField
+                label="Agregar medidor"
+                value={newMeterSerial}
+                onChange={(e) => setNewMeterSerial(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                size="small"
+                placeholder="ABC123456"
+              />
+              <Button type="submit" variant="contained" disabled={addingMeter}>
+                {addingMeter ? 'Agregando…' : 'Agregar'}
+              </Button>
+            </Stack>
+          </>
+        )}
       </Stack>
 
       {isPaused && showCardAndRecharge && (
@@ -348,6 +466,11 @@ export default function Dashboard() {
 
               <Typography color="text.secondary">Energía disponible</Typography>
               <Typography variant="h5">{formatKwh(card.current_kwh)}</Typography>
+
+              <Divider sx={{ my: 2 }} />
+              <Button variant="outlined" color="error" onClick={handleReleaseSelected} disabled={releasingMeter}>
+                {releasingMeter ? 'Eliminando…' : 'Eliminar de mi cuenta'}
+              </Button>
             </CardContent>
           </Card>
 

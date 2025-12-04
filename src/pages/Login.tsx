@@ -37,6 +37,11 @@ export default function Login() {
       window.dispatchEvent(new Event('auth-changed'));
       setTimeout(() => navigate('/dashboard'), 500);
     } catch (err: any) {
+      const code = err?.response?.data?.code;
+      if (code === 'PAUSE_VERIFICATION_REQUIRED') {
+        setTimeout(() => navigate(`/reactivar?u=${encodeURIComponent(username)}`), 0);
+        return;
+      }
       const msg =
         err?.response?.data?.error ||
         err?.message ||

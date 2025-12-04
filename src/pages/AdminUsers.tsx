@@ -24,6 +24,7 @@ import MailLockIcon from '@mui/icons-material/MailLock';
 import SaveIcon from '@mui/icons-material/Save';
 import type { AdminUserRow } from '../api/client';
 import {
+  api,
   adminListUsers,
   adminSendReset,
   adminUpdateEmail,
@@ -36,6 +37,8 @@ type RowState = {
   savingEmail: boolean;
   savingStatus: boolean;
   sendingReset: boolean;
+  transferSerial: string;
+  transferring: boolean;
 };
 
 const ALL_STATUS_OPTIONS = ['Activo', 'Pausa', 'Deshabilitado', 'Suspendido'] as const;
@@ -62,6 +65,8 @@ export default function AdminUsers() {
           savingEmail: false,
           savingStatus: false,
           sendingReset: false,
+          transferSerial: '',
+          transferring: false,
         };
       }
       setRowState(st);
@@ -231,20 +236,59 @@ export default function AdminUsers() {
                       </Select>
                     </TableCell>
 
-                    <TableCell align="right" width={180}>
-                      <Tooltip title="Enviar enlace de restablecimiento (mock)">
-                        <span>
+                    <TableCell align="right" width={320}>
+                      <Stack spacing={1} alignItems="flex-end">
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ width: 1 }}>
+                          <TextField
+                            size="small"
+                            label="Serial"
+                            value={st?.transferSerial ?? ''}
+                            onChange={(e) =>
+                              setRow(u.id, (prev) => ({
+                                ...prev,
+                                transferSerial: e.target.value.replace(/\s+/g, '').toUpperCase(),
+                              }))
+                            }
+                            sx={{ maxWidth: 180 }}
+                          />
                           <Button
                             size="small"
-                            variant="outlined"
-                            startIcon={<MailLockIcon />}
-                            onClick={() => handleSendReset(u)}
-                            disabled={st?.sendingReset}
+                            variant="contained"
+                            onClick={async () => {
+                              const serial = (st?.transferSerial ?? '').trim();
+                              if (!serial) return;
+                              setRow(u.id, (prev) => ({ ...prev, transferring: true }));
+                              setError(null);
+                              setSuccess(null);
+                              try {
+                                await api.post('/admin/meters/transfer', { card_number: serial, to_user_id: u.id });
+                                setSuccess('Medidor transferido');
+                                setRow(u.id, (prev) => ({ ...prev, transferSerial: '' }));
+                              } catch (e: any) {
+                                setError(e?.response?.data?.error || e?.message || 'No se pudo transferir el medidor');
+                              } finally {
+                                setRow(u.id, (prev) => ({ ...prev, transferring: false }));
+                              }
+                            }}
+                            disabled={st?.transferring || !st?.transferSerial}
                           >
-                            Enviar enlace
+                            {st?.transferring ? 'Moviendo…' : 'Mover aquí'}
                           </Button>
-                        </span>
-                      </Tooltip>
+                        </Stack>
+                        <Tooltip title="Enviar enlace de restablecimiento (mock)">
+                          <span>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<MailLockIcon />}
+                              onClick={() => handleSendReset(u)}
+                              disabled={st?.sendingReset}
+                            >
+                              Enviar enlace
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 );

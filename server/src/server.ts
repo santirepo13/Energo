@@ -214,18 +214,22 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
       return res.status(400).json({ error: 'Username or email already exists' });
     }
 
-    // If a card number was provided, check for duplicates
-    if (card) {
-      const [cardRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT id FROM energy_cards WHERE card_number = ? LIMIT 1',
-        [card]
-      );
-      if (cardRows.length > 0) {
-        await conn.rollback();
-        await logSecurity('register_duplicate_card', username, ip, { card_number: card });
-        return res.status(400).json({ error: 'Card number already exists' });
-      }
-    }
+     // If a card number was provided, only block when it's already assigned to a user.
+     if (card) {
+       const [cardRows] = await conn.execute<RowDataPacket[]>(
+         'SELECT id, user_id FROM energy_cards WHERE card_number = ? LIMIT 1',
+         [card]
+       );
+       if ((cardRows as any[]).length > 0) {
+         const cr = (cardRows as any[])[0] as any;
+         if (cr.user_id != null) {
+           await conn.rollback();
+           await logSecurity('register_duplicate_card', username, ip, { card_number: card });
+           return res.status(400).json({ error: 'Medidor ya enlazado, por favor contacte a soporte' });
+         }
+         // If user_id is NULL (released), allow registration to proceed and we will claim it after creating the user.
+       }
+     }
 
     // Determine role_id: default to 'user', or use employee_code to set admin/audit
     let role_id: number | null = null;
@@ -280,23 +284,43 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     );
     const user_id = (userResult as ResultSetHeader).insertId;
  
-    // Insert energy card only if a non-empty normalized `card` was provided
-    if (card) {
-      try {
-        await conn.execute(
-          'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
-          [user_id, card]
-        );
-      } catch (e: any) {
-        // Handle race where another transaction inserted the same card concurrently
-        if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
-          await conn.rollback();
-          await logSecurity('register_duplicate_card', username, ip, { card_number: card, error: e?.message });
-          return res.status(400).json({ error: 'Card number already exists' });
-        }
-        throw e;
-      }
-    }
+     // Link or create energy card if a non-empty normalized `card` was provided
+     if (card) {
+       try {
+         // Try to claim a released meter if it already exists with no owner
+         const [existing] = await conn.execute<RowDataPacket[]>(
+           'SELECT id, user_id FROM energy_cards WHERE card_number = ? LIMIT 1',
+           [card]
+         );
+         if ((existing as any[]).length > 0) {
+           const er = (existing as any[])[0] as any;
+           if (er.user_id == null) {
+             await conn.execute(
+               'UPDATE energy_cards SET user_id = ?, released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
+               [user_id, Number(er.id)]
+             );
+           } else {
+             // Safety: should be prevented by earlier check
+             await conn.rollback();
+             await logSecurity('register_duplicate_card', username, ip, { card_number: card });
+             return res.status(400).json({ error: 'Medidor ya enlazado, por favor contacte a soporte' });
+           }
+         } else {
+           // Create a brand new meter
+           await conn.execute(
+             'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
+             [user_id, card]
+           );
+         }
+       } catch (e: any) {
+         if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+           await conn.rollback();
+           await logSecurity('register_duplicate_card', username, ip, { card_number: card, error: e?.message });
+           return res.status(400).json({ error: 'Medidor ya enlazado, por favor contacte a soporte' });
+         }
+         throw e;
+       }
+     }
   
     // Mark employee code as used (if applicable) and record usage in mapping table
     if (empCode && employeeCodeId != null) {
@@ -360,15 +384,27 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
     // Enforce status rules
     const statusName = (user.status_name || '').toString();
     const roleName = (user.role_name || '').toString();
-    // Special case: disabled admin should look like a non-existent account
-    if (roleName === 'admin' && statusName === 'Deshabilitado') {
-      await logSecurity('login_blocked_admin_disabled', username, ip, { status: statusName });
-      return res.status(401).json({ error: 'Cuenta no existe' });
+
+    // Paused accounts: require email confirmation (mock flow)
+    if (statusName === 'Pausa') {
+      await logSecurity('login_blocked_pause', username, ip, { status: statusName });
+      return res.status(403).json({
+        error: 'Cuenta en pausa. Debe confirmar la restauración desde su correo.',
+        code: 'PAUSE_VERIFICATION_REQUIRED',
+        username
+      });
     }
-    // Generic blocks
-    if (statusName === 'Deshabilitado' || statusName === 'Suspendido') {
-      await logSecurity('login_blocked_status', username, ip, { status: statusName });
-      return res.status(403).json({ error: `Cuenta ${statusName}. Contacte al administrador.` });
+
+    // Deshabilitado: look like non-existent account for all roles
+    if (statusName === 'Deshabilitado') {
+      await logSecurity('login_blocked_disabled', username, ip, { status: statusName, role: roleName });
+      return res.status(401).json({ error: 'cuenta no existe, si esto puede ser un error contéctese con soporte' });
+    }
+
+    // Suspendido: explicit blocked message
+    if (statusName === 'Suspendido') {
+      await logSecurity('login_blocked_suspended', username, ip, { status: statusName });
+      return res.status(403).json({ error: 'cuenta bloqueada, por favor contacte a soporte' });
     }
 
     (req.session as any).userId = user.id;
@@ -382,6 +418,56 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
     console.error(e);
     await logSecurity('login_error', username, ip, { error: e?.message });
     res.status(500).json({ error: 'Login failed' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Mock endpoint to verify and restore a paused account (no auth, lab only)
+app.post('/api/mock/pausa/verify', async (req: express.Request, res: express.Response) => {
+  const { username } = req.body as { username?: string };
+  const uname = (username ?? '').toString().trim();
+  if (!uname) return res.status(400).json({ error: 'Usuario requerido' });
+
+  const ip = clientIp(req);
+  const conn = await pool.getConnection();
+  try {
+    // Ensure the account exists and is currently in 'Pausa'
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      `SELECT u.id, s.name AS status_name
+       FROM users u
+       LEFT JOIN statuses s ON s.id = u.status_id
+       WHERE u.username = ?
+       LIMIT 1`,
+      [uname]
+    );
+    if ((rows as any[]).length === 0) {
+      await logSecurity('pause_verify_user_not_found', uname, ip, {});
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    const u = (rows as any[])[0] as any;
+    const currentStatus = (u.status_name ?? '').toString();
+    if (currentStatus !== 'Pausa') {
+      return res.status(400).json({ error: 'La cuenta no está en pausa' });
+    }
+
+    // Resolve 'Activo' status id
+    const [srows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
+      ['Activo']
+    );
+    if ((srows as any[]).length === 0) {
+      return res.status(500).json({ error: 'Misconfiguración del servidor (status Activo faltante)' });
+    }
+    const activeId = Number((srows as any[])[0].id);
+
+    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [activeId, Number(u.id)]);
+    await logSecurity('pause_restored_mock', uname, ip, { user_id: Number(u.id) });
+    return res.json({ message: 'Cuenta reactivada' });
+  } catch (e: any) {
+    console.error(e);
+    await logSecurity('pause_restore_error_mock', uname, ip, { error: e?.message });
+    return res.status(500).json({ error: 'No se pudo reactivar la cuenta' });
   } finally {
     conn.release();
   }
@@ -672,30 +758,32 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
     const info = (infoRows as any[])[0] || { username, role_name: null, status_name: null };
     const role = (info.role_name ?? null) as string | null;
 
+    let cards: any[] = [];
     let card: any = null;
     let pins: any[] = [];
     let logs: any[] = [];
 
     if (role === 'admin') {
-      // Admin: show global "Últimos movimientos" (all users), hide logs and card
+      // Admin: show global "Últimos movimientos" (all users), hide logs and card/cards
       const [pinRows] = await conn.execute<RowDataPacket[]>(
         'SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number FROM recharge_pins rp LEFT JOIN users u ON u.id = rp.user_id ORDER BY rp.created_at DESC LIMIT 100'
       );
       pins = pinRows as any[];
-      // logs remain empty; card remains null
+      // logs remain empty; card/cards remain null/empty
     } else if (role === 'audit') {
-      // Audit: show global security logs for all users, hide card and recharge history
+      // Audit: show global security logs for all users, hide card/cards and recharge history
       const [logRows] = await conn.execute<RowDataPacket[]>(
         'SELECT event_type, event_time, ip_address, details FROM security_logs ORDER BY event_time DESC LIMIT 200'
       );
       logs = logRows as any[];
     } else {
-      // Regular user: own card, own history, and hide logs
+      // Regular user: own cards, own history, and hide logs
       const [cardRows] = await conn.execute<RowDataPacket[]>(
-        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? LIMIT 1',
+        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? ORDER BY card_number ASC',
         [userId]
       );
-      card = (cardRows as any[])[0] || null;
+      cards = cardRows as any[];
+      card = (cards as any[])[0] || null;
 
       const [pinRows] = await conn.execute<RowDataPacket[]>(
         'SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number FROM recharge_pins rp LEFT JOIN users u ON u.id = rp.user_id WHERE rp.user_id = ? ORDER BY rp.created_at DESC',
@@ -705,18 +793,13 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
 
       // Hide logs for non-audit roles
       logs = [];
-      // If you want per-user logs instead, replace the above with:
-      // const [logRows] = await conn.execute<RowDataPacket[]>(
-      //   'SELECT event_type, event_time, ip_address, details FROM security_logs WHERE username = ? ORDER BY event_time DESC LIMIT 100',
-      //   [username]
-      // );
-      // logs = logRows as any[];
     }
 
     const costPerKwh = await getCostPerKwh(conn);
     res.json({
       current_user: { username: info.username, role: info.role_name, status: info.status_name },
       card,
+      cards,
       recharge_history: pins,
       security_logs: logs,
       cost_per_kwh: costPerKwh
@@ -742,10 +825,12 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
   const userId = (req.session as any).userId as number;
   const username = (req.session as any).username as string;
   const ip = clientIp(req);
-  const { amount, kwh } = req.body as { amount?: number; kwh?: number };
+  const { amount, kwh, card_number } = req.body as { amount?: number; kwh?: number; card_number?: string };
   if ((amount == null || isNaN(Number(amount))) && (kwh == null || isNaN(Number(kwh)))) {
     return res.status(400).json({ error: 'Provide either amount (COP) or kwh' });
   }
+  const selectedCardNumber = (typeof card_number === 'string' && card_number.trim() !== '') ? card_number.trim() : null;
+
   const conn = await pool.getConnection();
   try {
     // Check status; block when in Pausa/Deshabilitado/Suspendido for recharges
@@ -772,21 +857,41 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
       kwhVal = Math.max(0, Number(kwh));
       amountCOP = +(kwhVal * costPerKwh).toFixed(2);
     }
+
     await conn.beginTransaction();
-    const [cardRows] = await conn.execute<RowDataPacket[]>(
-      'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? FOR UPDATE',
-      [userId]
-    );
-    if ((cardRows as any[]).length === 0) {
-      await conn.rollback();
-      return res.status(400).json({ error: 'No energy card for user' });
+
+    let card: any;
+    if (selectedCardNumber) {
+      const [cardRows] = await conn.execute<RowDataPacket[]>(
+        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ? FOR UPDATE',
+        [userId, selectedCardNumber]
+      );
+      if ((cardRows as any[]).length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'No energy card for user with that card_number' });
+      }
+      card = (cardRows as any[])[0] as any;
+    } else {
+      const [cardRows] = await conn.execute<RowDataPacket[]>(
+        'SELECT card_number, current_balance, current_kwh FROM energy_cards WHERE user_id = ? FOR UPDATE',
+        [userId]
+      );
+      if ((cardRows as any[]).length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'No energy card for user' });
+      }
+      if ((cardRows as any[]).length > 1) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Multiple energy cards found. Specify card_number.' });
+      }
+      card = (cardRows as any[])[0] as any;
     }
-    const card = (cardRows as any[])[0] as any;
+
     const newBalance = +(Number(card.current_balance) + amountCOP).toFixed(2);
     const newKwh = +(Number(card.current_kwh) + kwhVal).toFixed(2);
     await conn.execute(
-      'UPDATE energy_cards SET current_balance = ?, current_kwh = ?, last_recharge = CURRENT_TIMESTAMP WHERE user_id = ?',
-      [newBalance, newKwh, userId]
+      'UPDATE energy_cards SET current_balance = ?, current_kwh = ?, last_recharge = CURRENT_TIMESTAMP WHERE user_id = ? AND card_number = ?',
+      [newBalance, newKwh, userId, card.card_number]
     );
     const pin = generatePin15();
     await conn.execute(
@@ -794,7 +899,7 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
       [userId, card.card_number, pin, amountCOP, kwhVal]
     );
     await conn.commit();
-    await logSecurity('recharge', username, ip, { amount: amountCOP, kwh: kwhVal, pin });
+    await logSecurity('recharge', username, ip, { amount: amountCOP, kwh: kwhVal, pin, card_number: card.card_number });
     res.json({
       pin_code: pin,
       card_number: card.card_number,
@@ -916,6 +1021,67 @@ app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req: 
 
 // Admin: mock send reset password link
 app.post('/api/admin/users/:id/send-reset', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+// Admin: transfer a meter (card_number) to a different user
+app.post('/api/admin/meters/transfer', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const adminUsername = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
+  const { card_number, to_user_id } = req.body as { card_number?: string; to_user_id?: number };
+  const card = (typeof card_number === 'string' && card_number.trim() !== '') ? card_number.trim() : null;
+  const toUserId = Number(to_user_id);
+
+  if (!card || !toUserId || !Number.isFinite(toUserId) || toUserId <= 0) {
+    return res.status(400).json({ error: 'card_number y to_user_id son obligatorios' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Ensure destination user exists
+    const [urows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM users WHERE id = ? LIMIT 1',
+      [toUserId]
+    );
+    if ((urows as any[]).length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Usuario destino no existe' });
+    }
+
+    // Lock meter row
+    const [crows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id, user_id FROM energy_cards WHERE card_number = ? LIMIT 1 FOR UPDATE',
+      [card]
+    );
+    if ((crows as any[]).length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Medidor no existe' });
+    }
+
+    const current = (crows as any[])[0] as any;
+    const fromUserId = current.user_id == null ? null : Number(current.user_id);
+
+    if (fromUserId === toUserId) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'El medidor ya pertenece al usuario destino' });
+    }
+
+    // Transfer ownership and clear release flags
+    await conn.execute(
+      'UPDATE energy_cards SET user_id = ?, released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
+      [toUserId, Number(current.id)]
+    );
+
+    await conn.commit();
+    await logSecurity('admin_meter_transfer', adminUsername, ip, { card_number: card, from_user_id: fromUserId, to_user_id: toUserId });
+    return res.json({ message: 'Medidor transferido' });
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo transferir el medidor' });
+  } finally {
+    conn.release();
+  }
+});
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid user id' });
   const conn = await pool.getConnection();
@@ -1096,7 +1262,14 @@ app.put('/api/me/profile', requireAuth, async (req: express.Request, res: expres
     res.json({ message: 'Perfil actualizado' });
   } catch (e: any) {
     if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
-      return res.status(400).json({ error: 'El documento ya está en uso por otra cuenta' });
+      const msg = String((e as any).sqlMessage || e.message || '');
+      if (msg.includes('uniq_phone') || msg.toLowerCase().includes('telefono')) {
+        return res.status(400).json({ error: 'El teléfono ya está en uso por otra cuenta' });
+      }
+      if (msg.includes('uniq_documento') || msg.toLowerCase().includes('tipo_identificacion') || msg.toLowerCase().includes('numero_identificacion')) {
+        return res.status(400).json({ error: 'El documento ya está en uso por otra cuenta' });
+      }
+      return res.status(400).json({ error: 'Datos de perfil ya están en uso por otra cuenta' });
     }
     console.error(e);
     res.status(500).json({ error: 'No se pudo actualizar el perfil' });
@@ -1173,6 +1346,122 @@ app.post('/api/me/status', requireAuth, async (req: express.Request, res: expres
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ error: 'No se pudo actualizar el estado' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * User meters management (list/add)
+ */
+app.get('/api/me/meters', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT card_number, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? ORDER BY card_number ASC',
+      [userId]
+    );
+    res.json({ meters: rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'No se pudo listar medidores' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/api/me/meters', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const username = (req.session as any).username as string | null;
+  const ip = clientIp(req);
+  const { card_number } = req.body as { card_number?: string };
+  const card = (typeof card_number === 'string' && card_number.trim() !== '') ? card_number.trim() : null;
+  if (!card) {
+    return res.status(400).json({ error: 'Debe enviar un número de medidor' });
+  }
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // If the meter exists and is released (user_id IS NULL), claim it.
+    const [found] = await conn.execute<RowDataPacket[]>(
+      'SELECT id, user_id, card_number, current_balance, current_kwh, last_recharge, released FROM energy_cards WHERE card_number = ? LIMIT 1',
+      [card]
+    );
+
+    if ((found as any[]).length > 0) {
+      const r = (found as any[])[0] as any;
+      if (r.user_id == null) {
+        // Claim released meter by linking to this user and clearing release flags
+        await conn.execute(
+          'UPDATE energy_cards SET user_id = ?, released = 0, released_by_user_id = NULL, released_at = NULL WHERE id = ?',
+          [userId, Number(r.id)]
+        );
+        await logSecurity('meter_claimed', username, ip, { card_number: card, new_user_id: userId });
+      } else {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Card number already exists' });
+      }
+    } else {
+      // Create a new meter record
+      await conn.execute(
+        'INSERT INTO energy_cards (user_id, card_number, current_balance, current_kwh) VALUES (?, ?, 0, 0)',
+        [userId, card]
+      );
+      await logSecurity('meter_added', username, ip, { card_number: card, user_id: userId });
+    }
+
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT card_number, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
+      [userId, card]
+    );
+
+    await conn.commit();
+
+    const meter = (rows as any[])[0] || { card_number: card, current_balance: 0, current_kwh: 0, last_recharge: null };
+    return res.json({ meter });
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo agregar el medidor' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Release/unlink a meter from the current user without deleting it,
+// so it can be linked to a different account later.
+app.delete('/api/me/meters/:card_number', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const username = (req.session as any).username as string | null;
+  const ip = clientIp(req);
+  const card = (req.params.card_number ?? '').toString().trim();
+  if (!card) {
+    return res.status(400).json({ error: 'Debe enviar un número de medidor' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
+      [userId, card]
+    );
+    if ((rows as any[]).length === 0) {
+      return res.status(404).json({ error: 'Medidor no encontrado' });
+    }
+    const id = Number((rows as any[])[0].id);
+
+    await conn.execute(
+      'UPDATE energy_cards SET user_id = NULL, released = 1, released_by_user_id = ?, released_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [userId, id]
+    );
+
+    await logSecurity('meter_released', username, ip, { card_number: card, user_id: userId });
+    return res.json({ message: 'Medidor liberado' });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo liberar el medidor' });
   } finally {
     conn.release();
   }

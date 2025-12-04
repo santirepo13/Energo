@@ -21,6 +21,7 @@ export type RegisterRequest = {
 export type RechargeRequest = {
   amount?: number; // COP
   kwh?: number;
+  card_number?: string; // optional: target a specific meter
 };
 
 export type UserInfo = {
@@ -31,11 +32,18 @@ export type UserInfo = {
 
 export type DashboardResponse = {
   current_user?: UserInfo;
+  // Back-compat: first card (may be null)
   card: {
     card_number: string;
     current_balance: number;
     current_kwh: number;
   } | null;
+  // New: full list of meters for the user
+  cards?: Array<{
+    card_number: string;
+    current_balance: number;
+    current_kwh: number;
+  }>;
   recharge_history: Array<{
     user_id?: number;
     email?: string | null;
@@ -238,5 +246,35 @@ export type SelfStatus = 'Pausa' | 'Deshabilitado';
 
 export async function meUpdateStatus(status: SelfStatus) {
   const res = await api.post('/me/status', { status });
+  return res.data as { message: string };
+}
+
+// Mock verification to restore a paused account (lab-only)
+export async function mockPausaVerify(username: string) {
+  const res = await api.post('/mock/pausa/verify', { username });
+  return res.data as { message: string };
+}
+
+// ==== User meters (self-service) ====
+
+export type UserMeter = {
+  card_number: string;
+  current_balance: number;
+  current_kwh: number;
+  last_recharge: string | null;
+};
+
+export async function meListMeters() {
+  const res = await api.get('/me/meters');
+  return res.data as { meters: UserMeter[] };
+}
+
+export async function meAddMeter(card_number: string) {
+  const res = await api.post('/me/meters', { card_number });
+  return res.data as { meter: UserMeter };
+}
+
+export async function meReleaseMeter(card_number: string) {
+  const res = await api.delete(`/me/meters/${encodeURIComponent(card_number)}`);
   return res.data as { message: string };
 }
