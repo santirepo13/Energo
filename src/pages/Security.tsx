@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography } from '@mui/material';
-import { meChangePassword, meUpdateStatus, meListMeters, meAddMeter, meReleaseMeter, type SelfStatus, type UserMeter } from '../api/client';
+import { meChangePassword, meUpdateStatus, meListMeters, meAddMeter, meReleaseMeter, meRenameMeter, type SelfStatus, type UserMeter } from '../api/client';
 
 export default function SecurityPage() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -22,6 +22,8 @@ export default function SecurityPage() {
   const [newMeterName, setNewMeterName] = useState('');
   const [addingMeter, setAddingMeter] = useState(false);
   const [releasing, setReleasing] = useState<string | null>(null);
+  const [nameInputs, setNameInputs] = useState<Record<string, string>>({});
+  const [savingName, setSavingName] = useState<string | null>(null);
 
   // Load current meters
   useEffect(() => {
@@ -29,7 +31,12 @@ export default function SecurityPage() {
     (async () => {
       try {
         const mr = await meListMeters();
-        if (mounted) setMeters(mr.meters || []);
+        if (mounted) {
+          setMeters(mr.meters || []);
+          const map: Record<string, string> = {};
+          (mr.meters || []).forEach((m) => { map[m.card_number] = m.name ?? ''; });
+          setNameInputs(map);
+        }
       } catch (e: any) {
         if (mounted) setMetersError(e?.response?.data?.error || e?.message || 'Error al cargar medidores');
       } finally {
@@ -56,6 +63,7 @@ export default function SecurityPage() {
         const exists = prev.some((m) => m.card_number === res.meter.card_number);
         return exists ? prev : [res.meter, ...prev];
       });
+      setNameInputs((prev) => ({ ...prev, [res.meter.card_number]: res.meter.name ?? '' }));
       setMetersSuccess('Medidor agregado');
       setNewMeterSerial('');
       setNewMeterName('');
@@ -66,6 +74,26 @@ export default function SecurityPage() {
       setAddingMeter(false);
     }
   }
+
+ async function handleSaveMeterName(card: string) {
+   setMetersError(null);
+   setMetersSuccess(null);
+   const current = (nameInputs[card] ?? '').trim();
+   setSavingName(card);
+   try {
+     const res = await meRenameMeter(card, current.length ? current : null);
+     setMeters((prev) =>
+       prev.map((m) =>
+         m.card_number === card ? { ...m, name: res.meter.name ?? null } : m
+       )
+     );
+     setMetersSuccess('Nombre de medidor actualizado');
+   } catch (e: any) {
+     setMetersError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el nombre');
+   } finally {
+     setSavingName(null);
+   }
+ }
 
   async function handleReleaseMeter(card: string) {
     setMetersError(null);
@@ -203,28 +231,54 @@ export default function SecurityPage() {
           </Stack>
           <Stack spacing={1}>
             {metersLoading && <Typography>Cargando medidores…</Typography>}
-            {!metersLoading && meters.map((m) => (
-              <Stack
-                key={m.card_number}
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.04)', borderRadius: 1 }}
-              >
-                <Typography>
-                  {(m.name ? m.name : m.card_number)} ({m.card_number})
-                </Typography>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={() => handleReleaseMeter(m.card_number)}
-                  disabled={releasing === m.card_number}
+            {!metersLoading && meters.map((m) => {
+              const inputVal = nameInputs[m.card_number] ?? (m.name ?? '');
+              const original = (m.name ?? '');
+              const changed = (inputVal ?? '').trim() !== original;
+              return (
+                <Stack
+                  key={m.card_number}
+                  direction={{ xs: 'column', sm: 'row' }}
+                  alignItems={{ xs: 'stretch', sm: 'center' }}
+                  justifyContent="space-between"
+                  spacing={1}
+                  sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.04)', borderRadius: 1 }}
                 >
-                  {releasing === m.card_number ? 'Eliminando…' : 'Eliminar'}
-                </Button>
-              </Stack>
-            ))}
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flex: 1, mr: 1 }}>
+                    <TextField
+                      size="small"
+                      label="Nombre"
+                      value={inputVal}
+                      onChange={(e) =>
+                        setNameInputs((prev) => ({ ...prev, [m.card_number]: e.target.value }))
+                      }
+                      placeholder="Casa principal"
+                      sx={{ minWidth: 240 }}
+                      helperText={`Serial: ${m.card_number}`}
+                    />
+                  </Stack>
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => handleSaveMeterName(m.card_number)}
+                      disabled={savingName === m.card_number || !changed}
+                    >
+                      {savingName === m.card_number ? 'Guardando…' : 'Guardar'}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      onClick={() => handleReleaseMeter(m.card_number)}
+                      disabled={releasing === m.card_number}
+                    >
+                      {releasing === m.card_number ? 'Eliminando…' : 'Eliminar'}
+                    </Button>
+                  </Stack>
+                </Stack>
+              );
+            })}
             {!metersLoading && meters.length === 0 && (
               <Typography color="text.secondary">Sin medidores registrados.</Typography>
             )}

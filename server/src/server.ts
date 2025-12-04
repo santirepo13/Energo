@@ -1472,6 +1472,57 @@ app.delete('/api/me/meters/:card_number', requireAuth, async (req: express.Reque
  * JSON parse error handler - body-parser throws a SyntaxError before route handlers when JSON is invalid.
  * This middleware catches that and returns a clearer response while logging the raw body to help debugging.
  */
+/**
+ * Update meter name (self-service)
+ * PATCH /api/me/meters/:card_number
+ * Body: { name?: string | null }   // null or empty string clears the name
+ */
+app.patch('/api/me/meters/:card_number', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const username = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
+  const card = (req.params.card_number ?? '').toString().trim();
+  if (!card) return res.status(400).json({ error: 'Debe enviar un número de medidor' });
+
+  let name: string | null = null;
+  const raw = req.body as { name?: string | null };
+  if (raw && typeof raw.name === 'string') {
+    const trimmed = raw.name.trim();
+    name = trimmed ? trimmed.slice(0, 100) : null;
+  } else if (raw && raw.name === null) {
+    name = null;
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
+      [userId, card]
+    );
+    if ((rows as any[]).length === 0) {
+      return res.status(404).json({ error: 'Medidor no encontrado' });
+    }
+
+    await conn.execute(
+      'UPDATE energy_cards SET name = ? WHERE user_id = ? AND card_number = ?',
+      [name, userId, card]
+    );
+
+    const [out] = await conn.execute<RowDataPacket[]>(
+      'SELECT card_number, name, current_balance, current_kwh, last_recharge FROM energy_cards WHERE user_id = ? AND card_number = ? LIMIT 1',
+      [userId, card]
+    );
+
+    await logSecurity('meter_renamed', username, ip, { card_number: card, name });
+    return res.json({ meter: (out as any[])[0] });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo actualizar el nombre del medidor' });
+  } finally {
+    conn.release();
+  }
+});
+
 app.use(async (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err && err instanceof SyntaxError && 'body' in err) {
     const raw = (req as any).rawBody;

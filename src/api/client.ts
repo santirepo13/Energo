@@ -283,3 +283,9 @@ export async function meReleaseMeter(card_number: string) {
   const res = await api.delete(`/me/meters/${encodeURIComponent(card_number)}`);
   return res.data as { message: string };
 }
+
+// Edit meter name
+export async function meRenameMeter(card_number: string, name: string | null) {
+  const res = await api.patch(`/me/meters/${encodeURIComponent(card_number)}`, { name });
+  return res.data as { meter: UserMeter };
+}
