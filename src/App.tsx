@@ -24,6 +24,7 @@ function App() {
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null)
   const [showProfilePrompt, setShowProfilePrompt] = useState(false)
   const [waitingForProfile, setWaitingForProfile] = useState(false)
+  const [profileReady, setProfileReady] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const onHome = location.pathname === '/'
@@ -92,9 +93,9 @@ function App() {
           try {
             const pr = await meGetProfile()
             if (pr.personal_data_filled === true) {
-              setWaitingForProfile(false)
+              setProfileReady(true)
+              if (!location.pathname.startsWith('/me')) setWaitingForProfile(true)
               setShowProfilePrompt(false)
-              navigate('/dashboard', { replace: true })
             }
           } catch {}
         })()
@@ -106,9 +107,9 @@ function App() {
           try {
             const pr = await meGetProfile()
             if (pr.personal_data_filled === true) {
-              setWaitingForProfile(false)
+              setProfileReady(true)
+              if (!location.pathname.startsWith('/me')) setWaitingForProfile(true)
               setShowProfilePrompt(false)
-              navigate('/dashboard', { replace: true })
             }
           } catch {}
         })()
@@ -121,9 +122,9 @@ function App() {
       bc.onmessage = (ev: MessageEvent) => {
         const data: any = (ev as any)?.data ?? (ev as any)
         if (data === 'profile-updated' || data?.type === 'profile-updated') {
-          setWaitingForProfile(false)
+          setProfileReady(true)
+          if (!location.pathname.startsWith('/me')) setWaitingForProfile(true)
           setShowProfilePrompt(false)
-          navigate('/dashboard', { replace: true })
         }
       }
     } catch {}
@@ -146,9 +147,9 @@ function App() {
         const pr = await meGetProfile()
         if (cancelled) return
         if (pr.personal_data_filled === true) {
-          setWaitingForProfile(false)
+          setProfileReady(true)
+          if (!location.pathname.startsWith('/me')) setWaitingForProfile(true)
           setShowProfilePrompt(false)
-          navigate('/dashboard', { replace: true })
         }
       } catch {}
     }
@@ -175,16 +176,41 @@ function App() {
         if (cancelled) return
         const filled = pr.personal_data_filled === true
         if (filled) {
-          setWaitingForProfile(false)
+          setProfileReady(true)
+          if (!location.pathname.startsWith('/me')) setWaitingForProfile(true)
           setShowProfilePrompt(false)
-          navigate('/dashboard', { replace: true })
         }
       } catch {}
     }
     const id = setInterval(check, 3000)
     check()
     return () => { cancelled = true; clearInterval(id) }
-  }, [authenticated, waitingForProfile, navigate])
+  }, [authenticated, waitingForProfile, navigate, location.pathname])
+
+  // When profileReady and this tab is visible, wait 2s then go to dashboard
+  useEffect(() => {
+    if (!waitingForProfile || !profileReady) return
+    let timer: number | null = null
+    const startIfVisible = () => {
+      if (document.visibilityState === 'visible' && !timer) {
+        timer = window.setTimeout(() => {
+          setWaitingForProfile(false)
+          setShowProfilePrompt(false)
+          setProfileReady(false)
+          navigate('/dashboard', { replace: true })
+        }, 2000)
+      }
+    }
+    startIfVisible()
+    const onFocus = () => startIfVisible()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      if (timer) window.clearTimeout(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [waitingForProfile, profileReady, navigate])
 
   async function handleLogout() {
     try {
@@ -313,20 +339,34 @@ function App() {
           )}
           {waitingForProfile && (
             <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'grid', placeItems: 'center' }}>
-              <Box sx={{
-                textAlign: 'center',
-                '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } }
-              }}>
-                <Box component="div" sx={{ fontSize: 96, display: 'inline-block', animation: 'spin 1.2s linear infinite' }}>
-                  ⚙️
+              {profileReady ? (
+                <Box sx={{ textAlign: 'center' }}>
+                  <Box component="div" sx={{ fontSize: 96, display: 'inline-block' }}>
+                    ✅
+                  </Box>
+                  <Typography variant="h6" sx={{ mt: 2 }}>
+                    Datos personales completados.
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+                    Esta pestaña se redirigirá al Panel en 2 segundos.
+                  </Typography>
                 </Box>
-                <Typography variant="h6" sx={{ mt: 2 }}>
-                  Esperando a que complete sus datos personales…
-                </Typography>
-                <Typography color="text.secondary" sx={{ mt: 1 }}>
-                  Cuando termine, vuelva a esta pestaña.
-                </Typography>
-              </Box>
+              ) : (
+                <Box sx={{
+                  textAlign: 'center',
+                  '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } }
+                }}>
+                  <Box component="div" sx={{ fontSize: 96, display: 'inline-block', animation: 'spin 1.2s linear infinite' }}>
+                    ⚙️
+                  </Box>
+                  <Typography variant="h6" sx={{ mt: 2 }}>
+                    Esperando a que complete sus datos personales…
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+                    Cuando termine, vuelva a esta pestaña.
+                  </Typography>
+                </Box>
+              )}
             </Paper>
           )}
         </Box>
