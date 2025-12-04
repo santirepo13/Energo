@@ -94,6 +94,19 @@ app.use(
   })
 );
 
+// Block access to hidden and sensitive files (e.g., .hg, .git, .env)
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  let p = req.path || '';
+  try { p = decodeURIComponent(p); } catch { /* ignore malformed encodings */ }
+  // Allow /.well-known for ACME challenges explicitly
+  if (p.startsWith('/.well-known/')) return next();
+  // Block any hidden path segment such as /.hg, /.git, /.env, /.svn, etc.
+  if (/(?:^|\/)\.[^/]/.test(p)) {
+    // Return 404 to avoid confirming existence during reconnaissance
+    return res.status(404).end();
+  }
+  next();
+});
 function clientIp(req: express.Request): string {
   return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
 }
