@@ -22,7 +22,16 @@ CREATE TABLE IF NOT EXISTS `user_profiles` (
 -- Document types suggestion (no enforced CHECK to keep compatibility):
 -- 'CC','CE','Pasaporte','PEP','RIF'
 
-ALTER TABLE `user_profiles`
-  ADD CONSTRAINT `fk_user_profiles_user`
-  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-  ON DELETE CASCADE ON UPDATE CASCADE;
+-- Ensure FK exists (idempotent)
+SET @__fk_exists := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'user_profiles'
+    AND CONSTRAINT_NAME = 'fk_user_profiles_user'
+);
+SET @__sql := IF(@__fk_exists = 0,
+  'ALTER TABLE `user_profiles` ADD CONSTRAINT `fk_user_profiles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+  'SELECT 1');
+PREPARE __stmt FROM @__sql;
+EXECUTE __stmt;
+DEALLOCATE PREPARE __stmt;
