@@ -882,6 +882,8 @@ app.patch('/api/admin/users/:id/email', requireAuth, requireAdmin, async (req: e
   const id = Number(req.params.id);
   const { email } = req.body as { email?: string };
   if (!id || !email) return res.status(400).json({ error: 'Invalid request' });
+  const adminUsername = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
   const conn = await pool.getConnection();
   try {
     // Block modifications to audit users
@@ -894,6 +896,13 @@ app.patch('/api/admin/users/:id/email', requireAuth, requireAdmin, async (req: e
     const exists = await callFirst<any>(conn, 'sp_users_email_exists_other', [email, id]);
     if (exists) return res.status(400).json({ error: 'Email already in use' });
     await conn.query('CALL sp_users_update_email(?, ?)', [id, email]);
+
+    // log under the target user's username
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [id]);
+    if (u && u.username) {
+      await logSecurity('admin_update_email', String(u.username), ip, { admin: adminUsername, new_email: email });
+    }
+
     res.json({ message: 'Email updated' });
   } catch (e) {
     console.error(e);
@@ -995,13 +1004,248 @@ app.post('/api/admin/meters/transfer', requireAuth, requireAdmin, async (req: ex
     if (!info || !u) return res.status(404).json({ error: 'User not found' });
     if ((info.role_name as string | null) === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
 
-    const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    const resetLink = `${CLIENT_ORIGIN}/reset-password?token=${token}`;
-    await logSecurity('password_reset_link', u.username, clientIp(req), { user_id: id, email: u.email, reset_link: resetLink });
-    res.json({ message: 'Password reset link queued (mock)', link: resetLink });
+    // Generate secure token and persist its hash with expiration
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    await conn.query(
+      'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 60 MINUTE))',
+      [id, tokenHash]
+    );
+
+    const resetLink = `${CLIENT_ORIGIN}/reset-password?token=${rawToken}`;
+    const ip = clientIp(req);
+    await logSecurity('password_reset_link', String(u.username), ip, { user_id: id, email: u.email, reset_link: resetLink });
+    res.json({ message: 'Password reset link generated', link: resetLink });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to send reset link' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Admin: get single user details (basic + profile + meters)
+ * GET /api/admin/users/:id
+ */
+app.get('/api/admin/users/:id', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isFinite(id)) return res.status(400).json({ error: 'Invalid user id' });
+  const conn = await pool.getConnection();
+  try {
+    const [urows]: any = await conn.query(
+      'SELECT u.id, u.username, u.email, u.created_at, u.last_login, r.name AS role, s.name AS status ' +
+      'FROM users u ' +
+      'LEFT JOIN roles r ON u.role_id = r.id ' +
+      'LEFT JOIN statuses s ON u.status_id = s.id ' +
+      'WHERE u.id = ? LIMIT 1',
+      [id]
+    );
+    const row = Array.isArray(urows) && urows.length ? urows[0] : null;
+    if (!row) return res.status(404).json({ error: 'User not found' });
+
+    const user = {
+      id: Number(row.id),
+      username: String(row.username),
+      email: String(row.email),
+      created_at: row.created_at,
+      last_login: row.last_login,
+      role: row.role ?? null,
+      status: row.status ?? null,
+    };
+
+    const profile = await callFirst<any>(conn, 'sp_user_profiles_get_by_user', [id]);
+    const meters = await callAll<any>(conn, 'sp_energy_cards_list_by_user', [id]);
+
+    return res.json({ user, profile, meters });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: 'Failed to load user' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Admin: important activity logs for a user
+ * GET /api/admin/users/:id/logs
+ */
+app.get('/api/admin/users/:id/logs', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isFinite(id)) return res.status(400).json({ error: 'Invalid user id' });
+  const conn = await pool.getConnection();
+  try {
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [id]);
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    const username = String(u.username);
+
+    const important = [
+      'login_success',
+      'recharge',
+      'meter_added',
+      'meter_released',
+      'profile_update',
+      'profile_document_changed',
+      'password_change_success',
+      'password_reset_link',
+      'admin_update_email',
+      'admin_suspend',
+      'admin_meter_transfer',
+      'meter_claimed',
+      'meter_renamed',
+      'pause_restored_mock',
+    ];
+    const placeholders = important.map(() => '?').join(',');
+    const params: any[] = [username, ...important];
+    const [rows]: any = await conn.query(
+      `SELECT id, event_type, event_time, ip_address, details
+       FROM security_logs
+       WHERE username = ? AND event_type IN (${placeholders})
+       ORDER BY event_time DESC
+       LIMIT 200`,
+      params
+    );
+    return res.json({ logs: Array.isArray(rows) ? rows : [] });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: 'Failed to load logs' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Admin: link a meter (serial/card_number) to a specific user
+ * POST /api/admin/users/:id/meters/link
+ * Body: { card_number: string, name?: string }
+ */
+app.post('/api/admin/users/:id/meters/link', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const targetUserId = Number(req.params.id);
+  const adminUsername = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
+  const { card_number, name } = req.body as { card_number?: string; name?: string };
+  const card = (typeof card_number === 'string' && card_number.trim() !== '') ? card_number.trim().toUpperCase() : null;
+  const meterName = (typeof name === 'string' && name.trim() !== '') ? name.trim().slice(0, 100) : null;
+
+  if (!targetUserId || !Number.isFinite(targetUserId) || !card) {
+    return res.status(400).json({ error: 'user id y card_number son obligatorios' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const targetU = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [targetUserId]);
+    if (!targetU) return res.status(404).json({ error: 'User not found' });
+    const targetName = String(targetU.username);
+    await conn.beginTransaction();
+
+    const found = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+    if (found) {
+      const currentUserId = found.user_id == null ? null : Number(found.user_id);
+      if (currentUserId == null) {
+        // Claim released meter
+        await conn.query('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [Number(found.id), targetUserId, meterName]);
+        await conn.commit();
+        await logSecurity('meter_added', targetName, ip, { card_number: card, new_user_id: targetUserId, by_admin: adminUsername });
+        return res.json({ message: 'Medidor vinculado' });
+      }
+      if (currentUserId === targetUserId) {
+        await conn.commit();
+        return res.json({ message: 'El medidor ya está vinculado a este usuario' });
+      }
+      // Transfer ownership
+      await conn.query('CALL sp_energy_cards_transfer_owner(?, ?)', [Number(found.id), targetUserId]);
+      await conn.commit();
+      await logSecurity('admin_meter_transfer', targetName, ip, { card_number: card, from_user_id: currentUserId, to_user_id: targetUserId, by_admin: adminUsername });
+      return res.json({ message: 'Medidor transferido' });
+    } else {
+      // Create a new meter
+      await conn.query('CALL sp_energy_cards_insert(?, ?, ?)', [targetUserId, card, meterName]);
+      await conn.commit();
+      await logSecurity('meter_added', targetName, ip, { card_number: card, new_user_id: targetUserId, by_admin: adminUsername });
+      return res.json({ message: 'Medidor vinculado' });
+    }
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo vincular el medidor' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Admin: unlink (release) a meter from a specific user without deleting it
+ * DELETE /api/admin/users/:id/meters/:card_number
+ */
+app.delete('/api/admin/users/:id/meters/:card_number', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const targetUserId = Number(req.params.id);
+  const adminUserId = (req.session as any)?.userId as number | undefined;
+  const adminUsername = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
+  const card = (req.params.card_number ?? '').toString().trim();
+  if (!targetUserId || !Number.isFinite(targetUserId) || !card) {
+    return res.status(400).json({ error: 'Parámetros inválidos' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [targetUserId]);
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    const targetName = String(u.username);
+    const resUpd = await callAll<any>(conn, 'sp_energy_cards_release_by_user_and_card', [targetUserId, card, adminUserId ?? targetUserId]);
+    const affected = Number((resUpd[0] || {}).affected_rows ?? 0);
+    if (affected === 0) {
+      return res.status(404).json({ error: 'Medidor no encontrado para este usuario' });
+    }
+    await logSecurity('meter_released', targetName, ip, { card_number: card, user_id: targetUserId, by_admin: adminUsername });
+    return res.json({ message: 'Medidor desvinculado' });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo desvincular el medidor' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Admin: suspend a user with reason (records in blocked table and updates status)
+ * POST /api/admin/users/:id/suspend
+ * Body: { reason: string }
+ */
+app.post('/api/admin/users/:id/suspend', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+  const targetUserId = Number(req.params.id);
+  const adminUserId = (req.session as any)?.userId as number | undefined;
+  const adminUsername = (req.session as any)?.username ?? null;
+  const ip = clientIp(req);
+  const { reason } = req.body as { reason?: string };
+  const rsn = (reason ?? '').toString().trim();
+
+  if (!targetUserId || !Number.isFinite(targetUserId) || !rsn) {
+    return res.status(400).json({ error: 'Debe enviar una razón válida' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    // Block modifications to audit users
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [targetUserId]);
+    if (!info) return res.status(404).json({ error: 'User not found' });
+    const targetRole = (info.role_name ?? null) as string | null;
+    if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [targetUserId]);
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    const targetName = String(u.username);
+
+    await conn.beginTransaction();
+    await conn.query('INSERT INTO blocked (user_id, reason, admin_user_id) VALUES (?, ?, ?)', [targetUserId, rsn, adminUserId ?? null]);
+    await conn.query('CALL sp_users_update_status_by_name(?, ?)', [targetUserId, 'Suspendido']);
+    await conn.commit();
+
+    await logSecurity('admin_suspend', targetName, ip, { user_id: targetUserId, reason: rsn, by_admin: adminUsername });
+    return res.json({ message: 'Cuenta suspendida' });
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo suspender la cuenta' });
   } finally {
     conn.release();
   }
@@ -1056,6 +1300,105 @@ app.post('/api/admin/kwh-price', requireAuth, requireAdmin, async (req: express.
     console.error(e);
     await logSecurity('kwh_price_update_error', (req.session as any)?.username ?? null, ip, { error: e?.message });
     res.status(500).json({ error: 'Failed to update price' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * Password reset endpoints (no auth)
+ * - GET /api/password/reset/validate?token=... -> { username, email }
+ * - POST /api/password/reset/complete { token, new_password } -> { message }
+ */
+app.get('/api/password/reset/validate', async (req: express.Request, res: express.Response) => {
+  const token = (req.query.token ?? '').toString().trim();
+  if (!token) return res.status(400).json({ error: 'Token requerido' });
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const conn = await pool.getConnection();
+  try {
+    const [rows]: any = await conn.query(
+      'SELECT pr.id, pr.user_id, pr.expires_at, pr.used_at, u.username, u.email ' +
+      'FROM password_resets pr ' +
+      'JOIN users u ON u.id = pr.user_id ' +
+      'WHERE pr.token_hash = ? ' +
+      'ORDER BY pr.id DESC LIMIT 1',
+      [tokenHash]
+    );
+
+    const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+    if (!row) return res.status(400).json({ error: 'Token inválido' });
+    if (row.used_at != null) return res.status(400).json({ error: 'Token ya utilizado' });
+    const exp = new Date(row.expires_at).getTime();
+    if (!isFinite(exp) || exp <= Date.now()) return res.status(400).json({ error: 'Token expirado' });
+
+    return res.json({ username: String(row.username), email: String(row.email) });
+  } catch (e: any) {
+    console.error(e);
+    return res.status(500).json({ error: 'Fallo al validar token' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/api/password/reset/complete', async (req: express.Request, res: express.Response) => {
+  const { token, new_password } = req.body as { token?: string; new_password?: string };
+  const rawToken = (token ?? '').toString().trim();
+  const newPassword = (new_password ?? '').toString();
+  if (!rawToken || !newPassword) {
+    return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' });
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows]: any = await conn.query(
+      'SELECT pr.id, pr.user_id, pr.expires_at, pr.used_at, u.username, u.email ' +
+      'FROM password_resets pr ' +
+      'JOIN users u ON u.id = pr.user_id ' +
+      'WHERE pr.token_hash = ? ' +
+      'ORDER BY pr.id DESC LIMIT 1 FOR UPDATE',
+      [tokenHash]
+    );
+
+    const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+    if (!row) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Token inválido' });
+    }
+    if (row.used_at != null) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Token ya utilizado' });
+    }
+    const exp = new Date(row.expires_at).getTime();
+    if (!isFinite(exp) || exp <= Date.now()) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Token expirado' });
+    }
+
+    const uname = String(row.username);
+    const email = String(row.email);
+    const policyError = passwordPolicyIssues(newPassword, uname, email);
+    if (policyError) {
+      await conn.rollback();
+      return res.status(400).json({ error: policyError });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await conn.query('CALL sp_users_update_password(?, ?)', [Number(row.user_id), hash]);
+    await conn.query('UPDATE password_resets SET used_at = CURRENT_TIMESTAMP WHERE id = ?', [Number(row.id)]);
+    await conn.commit();
+
+    await logSecurity('password_change_success', uname, clientIp(req), { via: 'reset_token' });
+    return res.json({ message: 'Contraseña actualizada' });
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo actualizar la contraseña' });
   } finally {
     conn.release();
   }

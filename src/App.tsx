@@ -6,11 +6,13 @@ import LoginPage from './pages/Login.tsx'
 import RegisterPage from './pages/Register.tsx'
 import DashboardPage from './pages/Dashboard.tsx'
 import AdminUsersPage from './pages/AdminUsers.tsx'
+import AdminUserDetailPage from './pages/AdminUserDetail.tsx'
 import AuditEmployeesPage from './pages/AuditEmployees.tsx'
 import ProfilePage from './pages/Profile.tsx'
 import SecurityPage from './pages/Security.tsx'
 import PausaRestorePage from './pages/PausaRestore.tsx'
 import HomePage from './pages/Home.tsx'
+import ResetPasswordPage from './pages/ResetPassword.tsx'
 import { useEffect, useState, useMemo } from 'react'
 import { getDashboard, api, meGetProfile } from './api/client'
 import type { UserInfo } from './api/client'
@@ -180,8 +182,10 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
           <Route path="/audit/employees" element={<AuditEmployeesPage />} />
           <Route path="/me" element={<ProfilePage />} />
           <Route path="/me/seguridad" element={<SecurityPage />} />
