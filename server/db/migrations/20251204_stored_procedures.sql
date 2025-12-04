@@ -178,9 +178,18 @@ END $$
 DROP PROCEDURE IF EXISTS sp_employee_codes_list $$
 CREATE PROCEDURE sp_employee_codes_list()
 BEGIN
-  SELECT ec.id, ec.code, ec.used, ec.created_at, ec.used_at, r.name AS role
+  SELECT
+    ec.id,
+    ec.code,
+    ec.used,
+    ec.created_at,
+    ec.used_at,
+    r.name AS role,
+    u.username AS used_by_username
   FROM employee_codes ec
   LEFT JOIN roles r ON r.id = ec.role_id
+  LEFT JOIN employee_code_usages ecu ON ecu.id = ec.employee_usage_id
+  LEFT JOIN users u ON u.id = ecu.user_id
   ORDER BY ec.created_at DESC;
 END $$
 

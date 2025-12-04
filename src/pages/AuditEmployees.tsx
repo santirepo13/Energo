@@ -20,26 +20,20 @@ import {
 import SecurityIcon from '@mui/icons-material/Security';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import PeopleIcon from '@mui/icons-material/People';
+import { useNavigate } from 'react-router-dom';
 import {
   auditListEmployees,
   auditUpdateStatus,
   auditListEmployeeCodes,
   auditGenerateEmployeeCode,
 } from '../api/client';
-import type { AdminUserRow } from '../api/client';
+import type { AdminUserRow, EmployeeCodeRow } from '../api/client';
 
-type EmployeeCodeRow = {
-  id: number;
-  code: string;
-  role: string | null;
-  used: number | boolean;
-  created_at: string;
-  used_at: string | null;
-};
 
 const ADMIN_STATUS_OPTIONS = ['Activo', 'Deshabilitado'] as const;
 
 export default function AuditEmployeesPage() {
+  const navigate = useNavigate();
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [employees, setEmployees] = useState<AdminUserRow[]>([]);
   const [empError, setEmpError] = useState<string | null>(null);
@@ -180,6 +174,7 @@ export default function AuditEmployeesPage() {
                 <TableCell>Código</TableCell>
                 <TableCell>Rol</TableCell>
                 <TableCell>Estado</TableCell>
+                <TableCell>Usado por</TableCell>
                 <TableCell>Creado</TableCell>
                 <TableCell>Usado</TableCell>
               </TableRow>
@@ -196,6 +191,7 @@ export default function AuditEmployeesPage() {
                       <Chip label="Disponible" size="small" color="success" />
                     )}
                   </TableCell>
+                  <TableCell>{(Number(c.used) === 1 || c.used === true) ? (c.used_by_username || '—') : '—'}</TableCell>
                   <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : '—'}</TableCell>
                   <TableCell>{c.used_at ? new Date(c.used_at).toLocaleString() : '—'}</TableCell>
                 </TableRow>
@@ -234,7 +230,12 @@ export default function AuditEmployeesPage() {
             </TableHead>
             <TableBody>
               {(employees ?? []).map((u) => (
-                <TableRow key={u.id}>
+                <TableRow
+                  key={u.id}
+                  hover={((u.role ?? '').toLowerCase() === 'admin')}
+                  sx={{ cursor: ((u.role ?? '').toLowerCase() === 'admin') ? 'pointer' : 'default' }}
+                  onClick={() => ((u.role ?? '').toLowerCase() === 'admin') && navigate(`/audit/admins/${u.id}`)}
+                >
                   <TableCell>{u.id}</TableCell>
                   <TableCell>{u.username}</TableCell>
                   <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email ?? '—'}</TableCell>
@@ -254,63 +255,6 @@ export default function AuditEmployeesPage() {
         )}
       </Paper>
 
-      <Paper sx={{ p: 2, bgcolor: '#ffffff', color: '#111' }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-          <SecurityIcon sx={{ color: '#90caf9' }} />
-          <Typography variant="h6" color="inherit">Administradores - Cambiar estado</Typography>
-        </Stack>
-        {statusError && <Alert severity="error" sx={{ mb: 1 }}>{statusError}</Alert>}
-        {loadingEmployees ? (
-          <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 120 }}><CircularProgress /></Box>
-        ) : (
-          <Table size="small" sx={{ color: 'inherit', '& td, & th': { borderColor: 'rgba(0,0,0,0.12)', color: 'inherit' } }}>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'rgba(0,0,0,0.04)' }}>
-                <TableCell>Usuario</TableCell>
-                <TableCell>Correo</TableCell>
-                <TableCell>Estado</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(employees ?? [])
-                .filter((u) => (u.role ?? '').toLowerCase() === 'admin')
-                .map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography fontWeight={600} color="inherit">{u.username}</Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {u.email ?? '—'}
-                    </TableCell>
-                    <TableCell width={220}>
-                      <Select
-                        size="small"
-                        fullWidth
-                        value={u.status || 'Activo'}
-                        onChange={(e) => handleChangeStatus(u.id, (e.target.value as any))}
-                        disabled={!!savingStatus[u.id]}
-                        sx={{
-                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.23)' },
-                        }}
-                      >
-                        {ADMIN_STATUS_OPTIONS.map((s) => (
-                          <MenuItem key={s} value={s}>{s}</MenuItem>
-                        ))}
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              {employees.filter((u) => (u.role ?? '').toLowerCase() === 'admin').length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} align="center">Sin administradores.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </Paper>
     </Stack>
   );
 }

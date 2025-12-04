@@ -575,6 +575,120 @@ app.patch('/api/audit/users/:id/status', requireAuth, requireAudit, async (req: 
   }
 });
 
+// Audit: get admin details (basic + profile)
+app.get('/api/audit/admins/:id', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isFinite(id)) return res.status(400).json({ error: 'Invalid user id' });
+  const conn = await pool.getConnection();
+  try {
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [id]);
+    if (!info) return res.status(404).json({ error: 'User not found' });
+    const role = (info.role_name ?? null) as string | null;
+    if (role !== 'admin') return res.status(403).json({ error: 'Only admin users allowed' });
+
+    const [urows]: any = await conn.query(
+      'SELECT u.id, u.username, u.email, u.created_at, u.last_login, r.name AS role, s.name AS status ' +
+      'FROM users u ' +
+      'LEFT JOIN roles r ON u.role_id = r.id ' +
+      'LEFT JOIN statuses s ON u.status_id = s.id ' +
+      'WHERE u.id = ? LIMIT 1',
+      [id]
+    );
+    const row = Array.isArray(urows) && urows.length ? urows[0] : null;
+    if (!row) return res.status(404).json({ error: 'User not found' });
+
+    const user = {
+      id: Number(row.id),
+      username: String(row.username),
+      email: String(row.email),
+      created_at: row.created_at,
+      last_login: row.last_login,
+      role: row.role ?? null,
+      status: row.status ?? null,
+    };
+    const profile = await callFirst<any>(conn, 'sp_user_profiles_get_by_user', [id]);
+    return res.json({ user, profile });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Failed to load admin' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Audit: update admin personal data (perfil)
+app.put('/api/audit/admins/:id/profile', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isFinite(id)) return res.status(400).json({ error: 'Invalid user id' });
+
+  const {
+    primer_nombre,
+    segundo_nombre,
+    primer_apellido,
+    segundo_apellido,
+    tipo_identificacion,
+    numero_identificacion,
+    direccion,
+    telefono,
+  } = req.body as {
+    primer_nombre?: string;
+    segundo_nombre?: string | null;
+    primer_apellido?: string;
+    segundo_apellido?: string | null;
+    tipo_identificacion?: string;
+    numero_identificacion?: string;
+    direccion?: string | null;
+    telefono?: string | null;
+  };
+
+  const pn = (primer_nombre ?? '').toString().trim();
+  const pa = (primer_apellido ?? '').toString().trim();
+  const tipo = (tipo_identificacion ?? '').toString().trim();
+  const num = (numero_identificacion ?? '').toString().trim();
+
+  if (!pn || !pa || !tipo || !num) {
+    return res.status(400).json({ error: 'Campos obligatorios: primer_nombre, primer_apellido, tipo_identificacion, numero_identificacion' });
+  }
+
+  const sn = (segundo_nombre ?? '').toString().trim() || null;
+  const sa = (segundo_apellido ?? '').toString().trim() || null;
+  const dir = (direccion ?? '').toString().trim() || null;
+  const tel = (telefono ?? '').toString().trim() || null;
+
+  const conn = await pool.getConnection();
+  try {
+    // Ensure target is admin
+    const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [id]);
+    if (!info) return res.status(404).json({ error: 'User not found' });
+    const role = (info.role_name ?? null) as string | null;
+    if (role !== 'admin') return res.status(403).json({ error: 'Solo se permiten administradores' });
+
+    await conn.beginTransaction();
+    await conn.query('CALL sp_user_profiles_upsert(?, ?, ?, ?, ?, ?, ?, ?, ?)', [id, pn, sn, pa, sa, tipo, num, dir, tel]);
+    await conn.commit();
+
+    const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [id]);
+    await logSecurity('audit_profile_update', String(u?.username ?? null), clientIp(req), { by_audit: (req.session as any)?.username ?? null, user_id: id });
+    return res.json({ message: 'Perfil actualizado' });
+  } catch (e: any) {
+    try { await conn.rollback(); } catch {}
+    if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+      const msg = String((e as any).sqlMessage || e.message || '');
+      if (msg.includes('uniq_phone') || msg.toLowerCase().includes('telefono')) {
+        return res.status(400).json({ error: 'El teléfono ya está en uso por otra cuenta' });
+      }
+      if (msg.includes('uniq_documento') || msg.toLowerCase().includes('tipo_identificacion') || msg.toLowerCase().includes('numero_identificacion')) {
+        return res.status(400).json({ error: 'El documento ya está en uso por otra cuenta' });
+      }
+      return res.status(400).json({ error: 'Datos de perfil ya están en uso por otra cuenta' });
+    }
+    console.error(e);
+    return res.status(500).json({ error: 'No se pudo actualizar el perfil' });
+  } finally {
+    conn.release();
+  }
+});
+
 // Audit: sales metrics over time (independent of current cost setting)
 app.get('/api/audit/metrics', requireAuth, requireAudit, async (req: express.Request, res: express.Response) => {
   const days = Math.max(1, Math.min(365, Number((req.query.days as string) ?? 30) || 30));

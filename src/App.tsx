@@ -9,6 +9,7 @@ import AdminUsersPage from './pages/AdminUsers.tsx'
 import AdminUserDetailPage from './pages/AdminUserDetail.tsx'
 import AuditEmployeesPage from './pages/AuditEmployees.tsx'
 import ProfilePage from './pages/Profile.tsx'
+import AuditAdminDetailPage from './pages/AuditAdminDetail.tsx'
 import SecurityPage from './pages/Security.tsx'
 import PausaRestorePage from './pages/PausaRestore.tsx'
 import HomePage from './pages/Home.tsx'
@@ -187,6 +188,7 @@ function App() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
           <Route path="/audit/employees" element={<AuditEmployeesPage />} />
+          <Route path="/audit/admins/:id" element={<AuditAdminDetailPage />} />
           <Route path="/me" element={<ProfilePage />} />
           <Route path="/me/seguridad" element={<SecurityPage />} />
           <Route path="/me/ajustes" element={<SecurityPage />} />

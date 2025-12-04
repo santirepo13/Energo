@@ -176,6 +176,7 @@ export type EmployeeCodeRow = {
   used: number | boolean;
   created_at: string;
   used_at: string | null;
+  used_by_username?: string | null;
 };
 
 export async function auditListEmployees() {
