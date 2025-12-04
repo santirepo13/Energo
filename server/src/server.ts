@@ -60,9 +60,13 @@ async function testDbConnection() {
 }
 void testDbConnection();
 
-// Security header: prevent MIME type sniffing for all responses (incl. CORS preflight)
+// Security headers: prevent MIME type sniffing and clickjacking for all responses (incl. CORS preflight)
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // Anti-clickjacking: block all framing
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
   next();
 });
 

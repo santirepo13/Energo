@@ -6,6 +6,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    headers: {
+      'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "frame-ancestors 'none'",
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:4000',
