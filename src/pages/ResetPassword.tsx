@@ -28,7 +28,9 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const pwMismatch = pw.trim() !== '' && pw2.trim() !== '' && pw !== pw2;
 
   useEffect(() => {
     let mounted = true;
@@ -62,6 +64,10 @@ export default function ResetPasswordPage() {
 
   async function handleSubmit() {
     if (!token || !pw.trim()) return;
+    if (!pw2.trim() || pw !== pw2) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -69,6 +75,7 @@ export default function ResetPasswordPage() {
       const res = await api.post('/password/reset/complete', { token, new_password: pw });
       setSuccess(res.data?.message || 'Contraseña actualizada');
       setPw('');
+      setPw2('');
     } catch (e: any) {
       setError(e?.response?.data?.error || 'No se pudo actualizar la contraseña');
     } finally {
@@ -120,12 +127,38 @@ export default function ResetPasswordPage() {
                 />
               </Paper>
             </Box>
+            <Box>
+              <Typography variant="overline" color="text.secondary">Confirmar contraseña</Typography>
+              <Paper
+                variant="outlined"
+                sx={{
+                  mt: 0.5,
+                  p: '4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: 1,
+                }}
+              >
+                <InputBase
+                  type="password"
+                  placeholder="Repita la nueva contraseña"
+                  value={pw2}
+                  onChange={(e) => setPw2(e.target.value)}
+                  sx={{ flex: 1, fontSize: 16, py: 0.5 }}
+                />
+              </Paper>
+              {pwMismatch && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                  Las contraseñas no coinciden
+                </Typography>
+              )}
+            </Box>
 
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="contained"
                 onClick={handleSubmit}
-                disabled={submitting || !pw.trim()}
+                disabled={submitting || !pw.trim() || !pw2.trim() || pwMismatch}
               >
                 Actualizar contraseña
               </Button>
