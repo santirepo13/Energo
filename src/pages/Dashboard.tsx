@@ -544,6 +544,7 @@ export default function Dashboard() {
                   {isAdmin && <TableCell>Correo</TableCell>}
                   <TableCell align="right">Monto (COP)</TableCell>
                   <TableCell align="right">kWh</TableCell>
+                  <TableCell align="right">Precio kWh</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -562,11 +563,12 @@ export default function Dashboard() {
                     )}
                     <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
                     <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
+                    <TableCell align="right">{Number(r.kwh) > 0 ? formatCOPCost(+((Number(r.amount) / Number(r.kwh)).toFixed(2))) : '—'}</TableCell>
                   </TableRow>
                 ))}
                 {(!data || data.recharge_history.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 7 : 5} align="center">
+                    <TableCell colSpan={isAdmin ? 8 : 6} align="center">
                       Sin recargas todavía.
                     </TableCell>
                   </TableRow>
