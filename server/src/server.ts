@@ -60,6 +60,12 @@ async function testDbConnection() {
 }
 void testDbConnection();
 
+// Security header: prevent MIME type sniffing for all responses (incl. CORS preflight)
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json({
   // capture raw body for better error logging when JSON parse fails
