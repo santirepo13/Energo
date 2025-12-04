@@ -82,7 +82,11 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }, // dev only, not HTTPS
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    }, // SameSite mitigates CSRF; secure only in production
   })
 );
 
