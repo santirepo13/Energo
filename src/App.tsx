@@ -82,7 +82,7 @@ function App() {
         const pr = await meGetProfile()
         if (!mounted) return
         const filled = pr.personal_data_filled === true
-        if (!filled) setShowProfilePrompt(true)
+        if (!filled && !location.pathname.startsWith('/me')) setShowProfilePrompt(true)
       } catch {}
     })()
     const onMsg = (e: MessageEvent) => {
@@ -96,7 +96,7 @@ function App() {
       mounted = false
       window.removeEventListener('message', onMsg)
     }
-  }, [authenticated])
+  }, [authenticated, location.pathname])
 
   async function handleLogout() {
     try {
@@ -202,20 +202,20 @@ function App() {
         </Typography>
       </Box>
 
-      {authenticated === true && (showProfilePrompt || waitingForProfile) && (
+      {authenticated === true && !location.pathname.startsWith('/me') && (showProfilePrompt || waitingForProfile) && (
         <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center' }}>
           {showProfilePrompt && (
             <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Typography variant="h5" fontWeight={700}>Complete sus datos personales</Typography>
               <Alert severity="warning">Para continuar, complete su dirección y su teléfono.</Alert>
-              <Typography>Abra el formulario en una nueva pestaña, complételo y vuelva a esta ventana.</Typography>
+              <Typography>Será redirigido al formulario para completarlo.</Typography>
               <Box sx={{ mt: 'auto' }}>
                 <Button
                   variant="contained"
                   onClick={() => {
-                    window.open('/me', '_blank', 'noopener')
                     setShowProfilePrompt(false)
-                    setWaitingForProfile(true)
+                    setWaitingForProfile(false)
+                    navigate('/me')
                   }}
                 >
                   Completar datos personales
