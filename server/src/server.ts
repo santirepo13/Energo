@@ -86,6 +86,18 @@ async function selectLoginByUsernameRaw(conn: any, username: string) {
   const row = Array.isArray(rows) && rows.length ? rows[0] : null;
   return row;
 }
+
+// Collation-safe raw fallback for duplicate check in register when SP collation mismatches
+async function findUserIdByUsernameOrEmailRaw(conn: any, username: string, email: string) {
+  const [rows]: any = await conn.query(
+    'SELECT id FROM users ' +
+    'WHERE username = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
+    '   OR email    = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
+    'LIMIT 1',
+    [username, email]
+  );
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
 // Test DB connection on startup and log a clear status (non-fatal in dev)
 async function testDbConnection() {
   try {
@@ -280,8 +292,17 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
     // Use a transaction because we will potentially lock employee_codes and insert user + card
     await conn.beginTransaction();
 
-    // check duplicates (proc)
-    const dup = await callFirst<any>(conn, 'sp_users_find_by_username_or_email', [username, email]);
+    // check duplicates (proc) with collation-safe fallback
+    let dup: any = null;
+    try {
+      dup = await callFirst<any>(conn, 'sp_users_find_by_username_or_email', [username, email]);
+    } catch (e: any) {
+      if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+        dup = await findUserIdByUsernameOrEmailRaw(conn, username, email);
+      } else {
+        throw e;
+      }
+    }
     if (dup) {
       await conn.rollback();
       await logSecurity('register_duplicate', username, ip, { username, email });
