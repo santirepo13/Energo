@@ -89,6 +89,15 @@ export default function Dashboard() {
   // Meters
   const cards = data?.cards ?? (data?.card ? [data.card] : []);
   const [selectedCardNumber, setSelectedCardNumber] = useState<string | null>(null);
+  
+  // Map card_number -> display name (or fallback to number)
+  const cardNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (data?.cards ?? (data?.card ? [data.card] : [])).forEach((c) => {
+      map[c.card_number] = c.name ?? '';
+    });
+    return map;
+  }, [data]);
 
   const [newMeterSerial, setNewMeterSerial] = useState<string>('');
   const [addingMeter, setAddingMeter] = useState(false);
@@ -530,6 +539,7 @@ export default function Dashboard() {
                 <TableRow>
                   <TableCell>Fecha</TableCell>
                   <TableCell>PIN</TableCell>
+                  <TableCell>Medidor</TableCell>
                   {isAdmin && <TableCell align="right">Usuario ID</TableCell>}
                   {isAdmin && <TableCell>Correo</TableCell>}
                   <TableCell align="right">Monto (COP)</TableCell>
@@ -543,6 +553,7 @@ export default function Dashboard() {
                     <TableCell>
                       <code style={{ letterSpacing: 1 }}>{r.pin_code}</code>
                     </TableCell>
+                    <TableCell>{cardNameMap[r.card_number] || r.card_number}</TableCell>
                     {isAdmin && <TableCell align="right">{r.user_id ?? '—'}</TableCell>}
                     {isAdmin && (
                       <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -555,7 +566,7 @@ export default function Dashboard() {
                 ))}
                 {(!data || data.recharge_history.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 6 : 4} align="center">
+                    <TableCell colSpan={isAdmin ? 7 : 5} align="center">
                       Sin recargas todavía.
                     </TableCell>
                   </TableRow>
