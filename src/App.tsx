@@ -136,7 +136,7 @@ function App() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth={false} disableGutters sx={{ m: 0, p: 0, width: '100%' }}>
+      <Container maxWidth={false} disableGutters sx={{ m: 0, p: 0, width: '100%', pt: 3 }}>
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />

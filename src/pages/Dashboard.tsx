@@ -33,7 +33,6 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
-import logo from '../assets/logo.png';
 import type { DashboardResponse, AuditMetrics } from '../api/client';
 import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice, meAddMeter, meReleaseMeter } from '../api/client';
 
@@ -332,7 +331,6 @@ export default function Dashboard() {
   return (
     <Stack spacing={3}>
       <Stack direction="row" spacing={2} alignItems="center">
-        <img src={logo} alt="Energo" style={{ height: 40, borderRadius: 6 }} />
         <Typography variant="h5" fontWeight={700}>
           Panel de control de Energo
         </Typography>
