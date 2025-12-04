@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import { AppBar, Toolbar, Typography, Button, Container, Box, ThemeProvider, createTheme, CssBaseline, IconButton, Avatar, Menu, MenuItem, Divider } from '@mui/material'
 import './App.css'
 import logo from './assets/logo.png'
@@ -10,6 +10,7 @@ import AuditEmployeesPage from './pages/AuditEmployees.tsx'
 import ProfilePage from './pages/Profile.tsx'
 import SecurityPage from './pages/Security.tsx'
 import PausaRestorePage from './pages/PausaRestore.tsx'
+import HomePage from './pages/Home.tsx'
 import { useEffect, useState, useMemo } from 'react'
 import { getDashboard, api } from './api/client'
 import type { UserInfo } from './api/client'
@@ -19,7 +20,9 @@ function App() {
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(null)
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null)
   const navigate = useNavigate()
-
+  const location = useLocation()
+  const onHome = location.pathname === '/'
+  
   const isAudit = currentUser?.role === 'audit'
 
   const theme = useMemo(() => {
@@ -83,10 +86,20 @@ function App() {
       <CssBaseline />
       <AppBar position="static" color="primary">
         <Toolbar>
-          <img src={logo} alt="Energo" style={{ height: 32, marginRight: 12, borderRadius: 4 }} />
-          <Typography variant="h6" component={Link} to="/dashboard" sx={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
-            Energo
-          </Typography>
+          {onHome && authenticated === true ? (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button color="inherit" component={Link} to="/dashboard">Panel de Recargas</Button>
+              <Button color="inherit" component={Link} to="/me">Datos personales</Button>
+              <Button color="inherit" component={Link} to="/me/ajustes">Ajustes</Button>
+            </Box>
+          ) : (
+            <>
+              <img src={logo} alt="Energo" style={{ height: 32, marginRight: 12, borderRadius: 4 }} />
+              <Typography variant="h6" component={Link} to="/" sx={{ color: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
+                Energo
+              </Typography>
+            </>
+          )}
           <Box sx={{ flexGrow: 1 }} />
           {authenticated === false && (
             <>
@@ -136,9 +149,9 @@ function App() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth={false} disableGutters sx={{ m: 0, p: 0, width: '100%', pt: 3, pl: { xs: 2, sm: 3, md: 4 } }}>
+      <Container maxWidth={false} disableGutters sx={{ m: 0, p: 0, width: '100%', pt: onHome ? 0 : 3, pl: onHome ? 0 : { xs: 2, sm: 3, md: 4 } }}>
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
