@@ -561,7 +561,7 @@ export default function Dashboard() {
                     )}
                     <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
                     <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
-                    <TableCell align="right">{Number(r.kwh) > 0 ? formatCOPCost(+((Number(r.amount) / Number(r.kwh)).toFixed(2))) : '—'}</TableCell>
+                    <TableCell align="right">{formatCOPCost(cost)}</TableCell>
                   </TableRow>
                 ))}
                 {(!data || data.recharge_history.length === 0) && (
