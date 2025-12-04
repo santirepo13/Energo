@@ -11,6 +11,7 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { meGetProfile, meUpdateProfile, type MeProfileResponse, type UpdateProfileRequest } from '../api/client';
@@ -34,6 +35,14 @@ export default function ProfilePage() {
     telefono: '',
   });
 
+  // UI/flow control for one-time document change
+  const [docEditEnabled, setDocEditEnabled] = useState(false);
+  const [docChangeUsed, setDocChangeUsed] = useState(false);
+  const [originalDoc, setOriginalDoc] = useState({
+    tipo_identificacion: 'CC',
+    numero_identificacion: '',
+  });
+
 
   useEffect(() => {
     let mounted = true;
@@ -54,6 +63,10 @@ export default function ProfilePage() {
             direccion: p.direccion || '',
             telefono: p.telefono || '',
           });
+          setOriginalDoc({
+            tipo_identificacion: p.tipo_identificacion || 'CC',
+            numero_identificacion: p.numero_identificacion || '',
+          });
         }
       } catch (e: any) {
         setError(e?.response?.data?.error || e?.message || 'Error al cargar el perfil');
@@ -65,6 +78,14 @@ export default function ProfilePage() {
     return () => { mounted = false; }
   }, []);
 
+  // Load persisted flag for one-time document change usage
+  useEffect(() => {
+    try {
+      const used = localStorage.getItem('energo-doc-change-used') === '1';
+      setDocChangeUsed(used);
+    } catch {}
+  }, []);
+
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -73,10 +94,21 @@ export default function ProfilePage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
     if (!form.primer_nombre.trim() || !form.primer_apellido.trim() || !form.tipo_identificacion || !form.numero_identificacion.trim()) {
       setError('Complete los campos obligatorios');
       return;
     }
+
+    const changedDoc =
+      form.tipo_identificacion !== originalDoc.tipo_identificacion ||
+      form.numero_identificacion.trim() !== originalDoc.numero_identificacion.trim();
+
+    if (changedDoc && docChangeUsed) {
+      setError('Ya usó su única oportunidad de cambio de documento. Para cambios de pasaporte, contacte a soporte.');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload: UpdateProfileRequest = {
@@ -90,7 +122,22 @@ export default function ProfilePage() {
         telefono: form.telefono.trim() || null,
       };
       await meUpdateProfile(payload);
-      setSuccess('Perfil actualizado correctamente');
+
+      if (changedDoc) {
+        try { localStorage.setItem('energo-doc-change-used', '1'); } catch {}
+        setDocChangeUsed(true);
+        setDocEditEnabled(false);
+        setOriginalDoc({
+          tipo_identificacion: form.tipo_identificacion,
+          numero_identificacion: form.numero_identificacion.trim(),
+        });
+      }
+
+      setSuccess('Perfil actualizado correctamente. Puede continuar en la pestaña anterior y cerrar esta ventana.');
+      // Notify opener tab if this was opened in a new tab/window
+      if (window.opener && !window.opener.closed) {
+        try { window.opener.postMessage('profile-updated', '*'); } catch {}
+      }
       window.dispatchEvent(new Event('auth-changed'));
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el perfil');
@@ -129,12 +176,14 @@ export default function ProfilePage() {
               onChange={(e) => set('primer_nombre', e.target.value)}
               required
               fullWidth
+              disabled
             />
             <TextField
               label="Segundo nombre"
               value={form.segundo_nombre}
               onChange={(e) => set('segundo_nombre', e.target.value)}
               fullWidth
+              disabled
             />
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -144,35 +193,46 @@ export default function ProfilePage() {
               onChange={(e) => set('primer_apellido', e.target.value)}
               required
               fullWidth
+              disabled
             />
             <TextField
               label="Segundo apellido"
               value={form.segundo_apellido}
               onChange={(e) => set('segundo_apellido', e.target.value)}
               fullWidth
+              disabled
             />
           </Stack>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <FormControl fullWidth>
-              <InputLabel id="tipo-id-label">Tipo de identificación</InputLabel>
-              <Select
-                labelId="tipo-id-label"
-                label="Tipo de identificación"
-                value={form.tipo_identificacion}
-                onChange={(e) => set('tipo_identificacion', e.target.value)}
-              >
-                {DOC_TYPES.map((t) => (
-                  <MenuItem key={t} value={t}>{t}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="Número de identificación"
-              value={form.numero_identificacion}
-              onChange={(e) => set('numero_identificacion', e.target.value)}
-              required
-              fullWidth
-            />
+          <Stack spacing={1}>
+            <Tooltip title="Podrá cambiar el tipo y número de documento solo una vez. Para cambios de número de pasaporte, contacte soporte.">
+              <Button size="small" variant="text" sx={{ alignSelf: 'flex-start', color: 'text.secondary', textTransform: 'none', p: 0, minWidth: 0 }}>
+                ℹ Información sobre cambio de documento
+              </Button>
+            </Tooltip>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <FormControl fullWidth>
+                <InputLabel id="tipo-id-label">Tipo de identificación</InputLabel>
+                <Select
+                  labelId="tipo-id-label"
+                  label="Tipo de identificación"
+                  value={form.tipo_identificacion}
+                  onChange={(e) => set('tipo_identificacion', e.target.value)}
+                  disabled={!docEditEnabled || docChangeUsed}
+                >
+                  {DOC_TYPES.map((t) => (
+                    <MenuItem key={t} value={t}>{t}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Número de identificación"
+                value={form.numero_identificacion}
+                onChange={(e) => set('numero_identificacion', e.target.value)}
+                required
+                fullWidth
+                disabled={!docEditEnabled || docChangeUsed}
+              />
+            </Stack>
           </Stack>
           <TextField
             label="Dirección"
@@ -190,10 +250,26 @@ export default function ProfilePage() {
             <Button type="submit" variant="contained" disabled={saving}>
               {saving ? 'Guardando…' : 'Guardar cambios'}
             </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              disabled={saving || docChangeUsed}
+              onClick={() => {
+                if (docChangeUsed) return;
+                const ok = window.confirm('Podrá cambiar su documento solo una vez. Para cambios de número de pasaporte, contacte a soporte. ¿Desea habilitar la edición de documento ahora?');
+                if (ok) setDocEditEnabled(true);
+              }}
+            >
+              {docChangeUsed ? 'Cambio de documento usado' : (docEditEnabled ? 'Editando documento…' : 'Cambiar documento')}
+            </Button>
             <Button color="secondary" onClick={() => window.history.back()} disabled={saving}>
               Cancelar
             </Button>
           </Stack>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Al guardar su información, usted autoriza el tratamiento de sus datos personales conforme a la Ley 1581 de 2012 y el Decreto 1377 de 2013. Consulte la Política de Tratamiento de Datos en
+            &nbsp;<a href="https://www.sic.gov.co/sites/default/files/normatividad/LEY_1581_2012.pdf" target="_blank" rel="noopener noreferrer">este enlace</a>.
+          </Typography>
         </Stack>
       </Paper>
 

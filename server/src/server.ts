@@ -1125,12 +1125,51 @@ app.put('/api/me/profile', requireAuth, async (req: express.Request, res: expres
 
   const conn = await pool.getConnection();
   try {
+    await conn.beginTransaction();
+
+    // Current stored profile (if any)
+    const current = await callFirst<any>(conn, 'sp_user_profiles_get_by_user', [userId]);
+    const curTipo = String(current?.tipo_identificacion ?? '');
+    const curNum = String(current?.numero_identificacion ?? '');
+
+    const docChanged = Boolean(
+      current &&
+      (curTipo !== tipo || curNum !== num)
+    );
+
+    if (docChanged) {
+      // Passport number change requires support
+      if (curTipo === 'Pasaporte' && tipo === 'Pasaporte' && curNum !== num) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Para cambios de número de pasaporte, contacte a soporte' });
+      }
+
+      // Enforce one-time change per user
+      const [existsRows]: any = await conn.query('SELECT id FROM user_document_changes WHERE user_id = ? LIMIT 1', [userId]);
+      const used = Array.isArray(existsRows) && existsRows.length > 0;
+      if (used) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Ya usó su única oportunidad de cambio de documento' });
+      }
+
+      await conn.query(
+        'INSERT INTO user_document_changes (user_id, old_tipo, old_numero, new_tipo, new_numero) VALUES (?, ?, ?, ?, ?)',
+        [userId, curTipo, curNum, tipo, num]
+      );
+    }
+
     await conn.query('CALL sp_user_profiles_upsert(?, ?, ?, ?, ?, ?, ?, ?, ?)', [userId, pn, sn, pa, sa, tipo, num, dir, tel]);
-    await logSecurity('profile_update', (req.session as any)?.username ?? null, clientIp(req), { user_id: userId });
+    await conn.commit();
+
+    await logSecurity(docChanged ? 'profile_document_changed' : 'profile_update', (req.session as any)?.username ?? null, clientIp(req), { user_id: userId });
     res.json({ message: 'Perfil actualizado' });
   } catch (e: any) {
+    try { await conn.rollback(); } catch {}
     if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
       const msg = String((e as any).sqlMessage || e.message || '');
+      if (msg.includes('user_document_changes') || msg.includes('uniq_user_document_changes_user')) {
+        return res.status(400).json({ error: 'Ya usó su única oportunidad de cambio de documento' });
+      }
       if (msg.includes('uniq_phone') || msg.toLowerCase().includes('telefono')) {
         return res.status(400).json({ error: 'El teléfono ya está en uso por otra cuenta' });
       }

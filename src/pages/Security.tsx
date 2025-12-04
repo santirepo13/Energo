@@ -24,6 +24,7 @@ export default function SecurityPage() {
   const [releasing, setReleasing] = useState<string | null>(null);
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({});
   const [savingName, setSavingName] = useState<string | null>(null);
+  const [editingNameFor, setEditingNameFor] = useState<string | null>(null);
 
   // Load current meters
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function SecurityPage() {
        )
      );
      setMetersSuccess('Nombre de medidor actualizado');
+     setEditingNameFor(null);
    } catch (e: any) {
      setMetersError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el nombre');
    } finally {
@@ -235,6 +237,7 @@ export default function SecurityPage() {
               const inputVal = nameInputs[m.card_number] ?? (m.name ?? '');
               const original = (m.name ?? '');
               const changed = (inputVal ?? '').trim() !== original;
+              const isEditing = editingNameFor === m.card_number;
               return (
                 <Stack
                   key={m.card_number}
@@ -245,27 +248,49 @@ export default function SecurityPage() {
                   sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.04)', borderRadius: 1 }}
                 >
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flex: 1, mr: 1 }}>
-                    <TextField
-                      size="small"
-                      label="Nombre"
-                      value={inputVal}
-                      onChange={(e) =>
-                        setNameInputs((prev) => ({ ...prev, [m.card_number]: e.target.value }))
-                      }
-                      placeholder="Casa principal"
-                      sx={{ minWidth: 240 }}
-                      helperText={`Serial: ${m.card_number}`}
-                    />
+                    {isEditing ? (
+                      <TextField
+                        size="small"
+                        label="Nombre"
+                        value={inputVal}
+                        onChange={(e) =>
+                          setNameInputs((prev) => ({ ...prev, [m.card_number]: e.target.value }))
+                        }
+                        placeholder="Casa principal"
+                        sx={{ minWidth: 240 }}
+                        helperText={`Serial: ${m.card_number}`}
+                        autoFocus
+                      />
+                    ) : (
+                      <Stack spacing={0.5} sx={{ minWidth: 240 }}>
+                        <Typography variant="body1" sx={{ userSelect: 'none' }}>
+                          {original || 'Sin nombre'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {`Serial: ${m.card_number}`}
+                        </Typography>
+                      </Stack>
+                    )}
                   </Stack>
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => handleSaveMeterName(m.card_number)}
-                      disabled={savingName === m.card_number || !changed}
-                    >
-                      {savingName === m.card_number ? 'Guardando…' : 'Guardar'}
-                    </Button>
+                    {isEditing ? (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => handleSaveMeterName(m.card_number)}
+                        disabled={savingName === m.card_number || !changed}
+                      >
+                        {savingName === m.card_number ? 'Guardando…' : 'Guardar'}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => setEditingNameFor(m.card_number)}
+                      >
+                        Editar
+                      </Button>
+                    )}
                     <Button
                       size="small"
                       variant="outlined"

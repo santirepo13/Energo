@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
-import { AppBar, Toolbar, Typography, Button, Container, Box, ThemeProvider, createTheme, CssBaseline, IconButton, Avatar, Menu, MenuItem, Divider } from '@mui/material'
+import { AppBar, Toolbar, Typography, Button, Container, Box, ThemeProvider, createTheme, CssBaseline, IconButton, Avatar, Menu, MenuItem, Divider, Alert, Paper } from '@mui/material'
 import './App.css'
 import logo from './assets/logo.png'
 import LoginPage from './pages/Login.tsx'
@@ -12,13 +12,15 @@ import SecurityPage from './pages/Security.tsx'
 import PausaRestorePage from './pages/PausaRestore.tsx'
 import HomePage from './pages/Home.tsx'
 import { useEffect, useState, useMemo } from 'react'
-import { getDashboard, api } from './api/client'
+import { getDashboard, api, meGetProfile } from './api/client'
 import type { UserInfo } from './api/client'
 
 function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(null)
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null)
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false)
+  const [waitingForProfile, setWaitingForProfile] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const onHome = location.pathname === '/'
@@ -68,6 +70,32 @@ function App() {
       window.removeEventListener('auth-changed', handler)
     }
   }, [])
+
+  useEffect(() => {
+    if (authenticated !== true) return
+    let mounted = true
+    ;(async () => {
+      try {
+        const pr = await meGetProfile()
+        if (!mounted) return
+        const p = pr.profile
+        const incomplete = !p || !p.direccion || !p.telefono
+        let shown = false
+        try { shown = localStorage.getItem('energo-profile-prompt-shown') === '1' } catch {}
+        if (incomplete && !shown) setShowProfilePrompt(true)
+      } catch {}
+    })()
+    const onMsg = (e: MessageEvent) => {
+      if ((e as any)?.data === 'profile-updated') {
+        setWaitingForProfile(false)
+      }
+    }
+    window.addEventListener('message', onMsg)
+    return () => {
+      mounted = false
+      window.removeEventListener('message', onMsg)
+    }
+  }, [authenticated])
 
   async function handleLogout() {
     try {
@@ -169,6 +197,49 @@ function App() {
           Proyecto Educativo por Santiago Restrepo Nivel Explorador
         </Typography>
       </Box>
+
+      {authenticated === true && (showProfilePrompt || waitingForProfile) && (
+        <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center' }}>
+          {showProfilePrompt && (
+            <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Typography variant="h5" fontWeight={700}>Complete sus datos personales</Typography>
+              <Alert severity="warning">Para continuar, complete su dirección y su teléfono.</Alert>
+              <Typography>Abra el formulario en una nueva pestaña, complételo y vuelva a esta ventana.</Typography>
+              <Box sx={{ mt: 'auto' }}>
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    try { localStorage.setItem('energo-profile-prompt-shown', '1') } catch {}
+                    window.open('/me', '_blank', 'noopener')
+                    setShowProfilePrompt(false)
+                    setWaitingForProfile(true)
+                  }}
+                >
+                  Completar datos personales
+                </Button>
+              </Box>
+            </Paper>
+          )}
+          {waitingForProfile && (
+            <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'grid', placeItems: 'center' }}>
+              <Box sx={{
+                textAlign: 'center',
+                '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } }
+              }}>
+                <Box component="div" sx={{ fontSize: 96, display: 'inline-block', animation: 'spin 1.2s linear infinite' }}>
+                  ⚙️
+                </Box>
+                <Typography variant="h6" sx={{ mt: 2 }}>
+                  Esperando a que complete sus datos personales…
+                </Typography>
+                <Typography color="text.secondary" sx={{ mt: 1 }}>
+                  Cuando termine, vuelva a esta pestaña.
+                </Typography>
+              </Box>
+            </Paper>
+          )}
+        </Box>
+      )}
     </ThemeProvider>
   )
 }
