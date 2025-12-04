@@ -58,11 +58,16 @@ const __origGetConnection = (pool as any).getConnection.bind(pool);
 
 // Stored procedure helpers (MariaDB 10.x compatible)
 // Builds placeholders and unwraps the first resultset of CALL responses.
-function procPlaceholders(n: number): string {
-  return n > 0 ? Array(n).fill('?').join(',') : '';
+function procPlaceholdersTyped(params: any[]): string {
+  if (!params || params.length === 0) return '';
+  return params
+    .map((v) => (typeof v === 'string'
+      ? "CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci"
+      : "?"))
+    .join(',');
 }
 async function callAll<T = any>(conn: any, proc: string, params: any[] = []): Promise<T[]> {
-  const sql = `CALL ${proc}(${procPlaceholders(params.length)})`;
+  const sql = `CALL ${proc}(${procPlaceholdersTyped(params)})`;
   const [rows]: any = await conn.query(sql, params);
   const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
   return Array.isArray(firstSet) ? (firstSet as T[]) : [];
