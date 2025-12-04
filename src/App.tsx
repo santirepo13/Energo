@@ -1,5 +1,5 @@
-import { Routes, Route, Link } from 'react-router-dom'
-import { AppBar, Toolbar, Typography, Button, Container, Box, ThemeProvider, createTheme, CssBaseline } from '@mui/material'
+import { Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { AppBar, Toolbar, Typography, Button, Container, Box, ThemeProvider, createTheme, CssBaseline, IconButton, Avatar, Menu, MenuItem, Divider } from '@mui/material'
 import './App.css'
 import logo from './assets/logo.png'
 import LoginPage from './pages/Login.tsx'
@@ -7,6 +7,8 @@ import RegisterPage from './pages/Register.tsx'
 import DashboardPage from './pages/Dashboard.tsx'
 import AdminUsersPage from './pages/AdminUsers.tsx'
 import AuditEmployeesPage from './pages/AuditEmployees.tsx'
+import ProfilePage from './pages/Profile.tsx'
+import SecurityPage from './pages/Security.tsx'
 import { useEffect, useState, useMemo } from 'react'
 import { getDashboard, api } from './api/client'
 import type { UserInfo } from './api/client'
@@ -14,6 +16,8 @@ import type { UserInfo } from './api/client'
 function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(null)
+  const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null)
+  const navigate = useNavigate()
 
   const isAudit = currentUser?.role === 'audit'
 
@@ -97,7 +101,35 @@ function App() {
               {currentUser?.role === 'audit' && (
                 <Button color="inherit" component={Link} to="/audit/employees">Registro empleados</Button>
               )}
-              <Button color="inherit" onClick={handleLogout}>Cerrar sesión</Button>
+              <IconButton
+                color="inherit"
+                onClick={(e) => setProfileAnchor(e.currentTarget)}
+                aria-label="Menú de perfil"
+                size="small"
+                sx={{ ml: 1 }}
+              >
+                <Avatar sx={{ width: 28, height: 28 }}>
+                  {(currentUser?.username || 'U').charAt(0).toUpperCase()}
+                </Avatar>
+              </IconButton>
+              <Menu
+                anchorEl={profileAnchor}
+                open={Boolean(profileAnchor)}
+                onClose={() => setProfileAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              >
+                <MenuItem onClick={() => { setProfileAnchor(null); navigate('/me'); }}>
+                  Datos personales
+                </MenuItem>
+                <MenuItem onClick={() => { setProfileAnchor(null); navigate('/me/seguridad'); }}>
+                  Seguridad
+                </MenuItem>
+                <Divider />
+                <MenuItem onClick={() => { setProfileAnchor(null); handleLogout(); }}>
+                  Cerrar sesión
+                </MenuItem>
+              </Menu>
             </>
           )}
         </Toolbar>
@@ -111,6 +143,8 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/audit/employees" element={<AuditEmployeesPage />} />
+          <Route path="/me" element={<ProfilePage />} />
+          <Route path="/me/seguridad" element={<SecurityPage />} />
         </Routes>
       </Container>
     </ThemeProvider>

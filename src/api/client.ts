@@ -182,3 +182,61 @@ export async function auditGenerateEmployeeCode(role: 'admin' | 'audit') {
   const res = await api.post('/audit/employee-codes', { role });
   return res.data as { id: number; code: string; role: 'admin' | 'audit' };
 }
+
+// ==== Perfil de usuario (self-service) ====
+
+// Datos del perfil (tabla user_profiles)
+export type UserProfile = {
+  primer_nombre: string;
+  segundo_nombre: string | null;
+  primer_apellido: string;
+  segundo_apellido: string | null;
+  tipo_identificacion: string;      // 'CC' | 'CE' | 'Pasaporte' | 'PEP' | 'RIF' | ...
+  numero_identificacion: string;
+  direccion: string | null;
+  telefono: string | null;
+};
+
+// Respuesta de GET /api/me/profile
+export type MeProfileResponse = {
+  username: string;
+  email: string;           // correo de registro (solo lectura en UI)
+  profile: UserProfile | null;
+};
+
+// Obtener perfil propio
+export async function meGetProfile() {
+  const res = await api.get('/me/profile');
+  return res.data as MeProfileResponse;
+}
+
+// Crear/Actualizar perfil propio
+export type UpdateProfileRequest = {
+  primer_nombre: string;
+  segundo_nombre?: string | null;
+  primer_apellido: string;
+  segundo_apellido?: string | null;
+  tipo_identificacion: string;
+  numero_identificacion: string;
+  direccion?: string | null;
+  telefono?: string | null;
+};
+
+export async function meUpdateProfile(data: UpdateProfileRequest) {
+  const res = await api.put('/me/profile', data);
+  return res.data as { message: string };
+}
+
+// Cambiar contraseña (valida política en backend)
+export async function meChangePassword(current_password: string, new_password: string) {
+  const res = await api.post('/me/password-change', { current_password, new_password });
+  return res.data as { message: string };
+}
+
+// Actualizar estado de la cuenta (Pausa o Deshabilitado)
+export type SelfStatus = 'Pausa' | 'Deshabilitado';
+
+export async function meUpdateStatus(status: SelfStatus) {
+  const res = await api.post('/me/status', { status });
+  return res.data as { message: string };
+}

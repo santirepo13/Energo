@@ -1002,6 +1002,183 @@ app.post('/api/admin/kwh-price', requireAuth, requireAdmin, async (req: express.
 });
 
 /**
+ * Self-service profile endpoints
+ * - GET /api/me/profile          -> devuelve username, email y perfil (si existe)
+ * - PUT /api/me/profile          -> crea/actualiza perfil (nombres, apellidos, documento, dirección, teléfono)
+ * - POST /api/me/password-change -> cambia contraseña validando política y contraseña actual
+ * - POST /api/me/status          -> auto-actualiza estado a "Pausa" o "Deshabilitado"
+ */
+
+app.get('/api/me/profile', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const conn = await pool.getConnection();
+  try {
+    const [urows] = await conn.execute<RowDataPacket[]>(
+      'SELECT username, email FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if ((urows as any[]).length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    const [prows] = await conn.execute<RowDataPacket[]>(
+      `SELECT primer_nombre, segundo_nombre, primer_apellido, segundo_apellido,
+              tipo_identificacion, numero_identificacion, direccion, telefono
+       FROM user_profiles WHERE user_id = ? LIMIT 1`,
+      [userId]
+    );
+    const u = (urows as any[])[0] as any;
+    const profile = (prows as any[]).length > 0 ? (prows as any[])[0] : null;
+    res.json({ username: String(u.username), email: String(u.email), profile });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'No se pudo cargar el perfil' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.put('/api/me/profile', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const {
+    primer_nombre,
+    segundo_nombre,
+    primer_apellido,
+    segundo_apellido,
+    tipo_identificacion,
+    numero_identificacion,
+    direccion,
+    telefono,
+  } = req.body as {
+    primer_nombre?: string;
+    segundo_nombre?: string | null;
+    primer_apellido?: string;
+    segundo_apellido?: string | null;
+    tipo_identificacion?: string;
+    numero_identificacion?: string;
+    direccion?: string | null;
+    telefono?: string | null;
+  };
+
+  const pn = (primer_nombre ?? '').toString().trim();
+  const pa = (primer_apellido ?? '').toString().trim();
+  const tipo = (tipo_identificacion ?? '').toString().trim();
+  const num = (numero_identificacion ?? '').toString().trim();
+
+  if (!pn || !pa || !tipo || !num) {
+    return res.status(400).json({ error: 'Campos obligatorios: primer_nombre, primer_apellido, tipo_identificacion, numero_identificacion' });
+  }
+
+  const sn = (segundo_nombre ?? '').toString().trim() || null;
+  const sa = (segundo_apellido ?? '').toString().trim() || null;
+  const dir = (direccion ?? '').toString().trim() || null;
+  const tel = (telefono ?? '').toString().trim() || null;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.execute(
+      `INSERT INTO user_profiles
+       (user_id, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido,
+        tipo_identificacion, numero_identificacion, direccion, telefono)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         primer_nombre = VALUES(primer_nombre),
+         segundo_nombre = VALUES(segundo_nombre),
+         primer_apellido = VALUES(primer_apellido),
+         segundo_apellido = VALUES(segundo_apellido),
+         tipo_identificacion = VALUES(tipo_identificacion),
+         numero_identificacion = VALUES(numero_identificacion),
+         direccion = VALUES(direccion),
+         telefono = VALUES(telefono),
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, pn, sn, pa, sa, tipo, num, dir, tel]
+    );
+    await logSecurity('profile_update', (req.session as any)?.username ?? null, clientIp(req), { user_id: userId });
+    res.json({ message: 'Perfil actualizado' });
+  } catch (e: any) {
+    if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+      return res.status(400).json({ error: 'El documento ya está en uso por otra cuenta' });
+    }
+    console.error(e);
+    res.status(500).json({ error: 'No se pudo actualizar el perfil' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/api/me/password-change', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const { current_password, new_password } = req.body as { current_password?: string; new_password?: string };
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'Debe enviar la contraseña actual y la nueva contraseña' });
+  }
+  const ip = clientIp(req);
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.execute<RowDataPacket[]>(
+      'SELECT username, email, password_hash FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if ((rows as any[]).length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    const u = (rows as any[])[0] as any;
+    const ok = await bcrypt.compare(current_password, u.password_hash);
+    if (!ok) {
+      await logSecurity('password_change_failed', (req.session as any)?.username ?? null, ip, { reason: 'bad_current' });
+      return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+    }
+    const pwdError = passwordPolicyIssues(new_password, String(u.username), String(u.email));
+    if (pwdError) {
+      await logSecurity('password_change_failed', (req.session as any)?.username ?? null, ip, { reason: 'policy', error: pwdError });
+      return res.status(400).json({ error: pwdError });
+    }
+    const hash = await bcrypt.hash(new_password, 10);
+    await conn.execute('UPDATE users SET password_hash = ?, password_changed_at = CURRENT_TIMESTAMP WHERE id = ?', [hash, userId]);
+    await logSecurity('password_change_success', (req.session as any)?.username ?? null, ip, {});
+    res.json({ message: 'Contraseña actualizada' });
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: 'No se pudo cambiar la contraseña' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/api/me/status', requireAuth, async (req: express.Request, res: express.Response) => {
+  const userId = (req.session as any).userId as number;
+  const { status } = req.body as { status?: string };
+  const desired = (status ?? '').toString();
+  if (!['Pausa', 'Deshabilitado'].includes(desired)) {
+    return res.status(400).json({ error: 'Estado inválido. Use "Pausa" o "Deshabilitado".' });
+  }
+  const conn = await pool.getConnection();
+  try {
+    const [srows] = await conn.execute<RowDataPacket[]>(
+      'SELECT id FROM statuses WHERE name = ? LIMIT 1',
+      [desired]
+    );
+    if ((srows as any[]).length === 0) {
+      return res.status(400).json({ error: 'Estado no disponible' });
+    }
+    const statusId = Number((srows as any[])[0].id);
+    await conn.execute('UPDATE users SET status_id = ? WHERE id = ?', [statusId, userId]);
+    await logSecurity('self_status_update', (req.session as any)?.username ?? null, clientIp(req), { status: desired });
+    if (desired === 'Deshabilitado') {
+      (req.session as any).destroy(() => {
+        res.json({ message: 'Cuenta deshabilitada y sesión cerrada' });
+      });
+    } else {
+      res.json({ message: 'Cuenta pausada' });
+    }
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: 'No se pudo actualizar el estado' });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
  * JSON parse error handler - body-parser throws a SyntaxError before route handlers when JSON is invalid.
  * This middleware catches that and returns a clearer response while logging the raw body to help debugging.
  */
