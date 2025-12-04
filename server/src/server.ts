@@ -71,6 +71,21 @@ async function callFirst<T = any>(conn: any, proc: string, params: any[] = []): 
   const all = await callAll<T>(conn, proc, params);
   return all.length ? all[0] : null;
 }
+
+// Collation-safe raw fallback for login when SP collation mismatches
+async function selectLoginByUsernameRaw(conn: any, username: string) {
+  const [rows]: any = await conn.query(
+    'SELECT u.id, u.password_hash, r.name AS role_name, s.name AS status_name ' +
+    'FROM users u ' +
+    'LEFT JOIN roles r ON r.id = u.role_id ' +
+    'LEFT JOIN statuses s ON s.id = u.status_id ' +
+    'WHERE u.username = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
+    'LIMIT 1',
+    [username]
+  );
+  const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+  return row;
+}
 // Test DB connection on startup and log a clear status (non-fatal in dev)
 async function testDbConnection() {
   try {
@@ -384,7 +399,16 @@ app.post('/api/login', async (req: express.Request, res: express.Response) => {
   const ip = clientIp(req);
   const conn = await pool.getConnection();
   try {
-    const user = await callFirst<any>(conn, 'sp_users_select_login_by_username', [username]);
+    let user: any = null;
+    try {
+      user = await callFirst<any>(conn, 'sp_users_select_login_by_username', [username]);
+    } catch (e: any) {
+      if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+        user = await selectLoginByUsernameRaw(conn, username);
+      } else {
+        throw e;
+      }
+    }
     if (!user) {
       await logSecurity('login_failed', username, ip, { reason: 'user_not_found' });
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -447,7 +471,16 @@ app.post('/api/mock/pausa/verify', async (req: express.Request, res: express.Res
   const conn = await pool.getConnection();
   try {
     // Ensure the account exists and is currently in 'Pausa'
-    const u = await callFirst<any>(conn, 'sp_users_select_login_by_username', [uname]);
+    let u: any = null;
+    try {
+      u = await callFirst<any>(conn, 'sp_users_select_login_by_username', [uname]);
+    } catch (e: any) {
+      if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+        u = await selectLoginByUsernameRaw(conn, uname);
+      } else {
+        throw e;
+      }
+    }
     if (!u) {
       await logSecurity('pause_verify_user_not_found', uname, ip, {});
       return res.status(404).json({ error: 'Usuario no encontrado' });
