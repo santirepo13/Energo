@@ -39,11 +39,23 @@ const pool: Pool = createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'ener-go',
   port: Number(process.env.DB_PORT || 3306),
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
  
+// Normalize session charset and collation to avoid utf8mb4_0900_ai_ci vs utf8mb4_general_ci mix
+const __origGetConnection = (pool as any).getConnection.bind(pool);
+(pool as any).getConnection = async () => {
+  const conn = await __origGetConnection();
+  try {
+    await conn.query("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci");
+    await conn.query("SET collation_connection = 'utf8mb4_general_ci'");
+  } catch (_e) { /* ignore */ }
+  return conn;
+};
+
 // Stored procedure helpers (MariaDB 10.x compatible)
 // Builds placeholders and unwraps the first resultset of CALL responses.
 function procPlaceholders(n: number): string {
