@@ -68,7 +68,6 @@ export default function AdminUserDetail() {
     if (!userId || !Number.isFinite(userId)) return;
     setLoading(true);
     setError(null);
-    setSuccess(null);
     try {
       const [dRes, lRes] = await Promise.all([
         api.get(`/admin/users/${userId}`),
