@@ -89,6 +89,7 @@ function App() {
       if ((e as any)?.data === 'profile-updated') {
         setWaitingForProfile(false)
         setShowProfilePrompt(false)
+        navigate('/dashboard', { replace: true })
       }
     }
     window.addEventListener('message', onMsg)
@@ -96,7 +97,7 @@ function App() {
       mounted = false
       window.removeEventListener('message', onMsg)
     }
-  }, [authenticated, location.pathname])
+  }, [authenticated, location.pathname, navigate])
 
   async function handleLogout() {
     try {
@@ -202,20 +203,20 @@ function App() {
         </Typography>
       </Box>
 
-      {authenticated === true && !location.pathname.startsWith('/me') && (showProfilePrompt || waitingForProfile) && (
+      {authenticated === true && ((location.pathname.startsWith('/me') ? waitingForProfile : (showProfilePrompt || waitingForProfile))) && (
         <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center' }}>
-          {showProfilePrompt && (
+          {showProfilePrompt && !location.pathname.startsWith('/me') && (
             <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Typography variant="h5" fontWeight={700}>Complete sus datos personales</Typography>
               <Alert severity="warning">Para continuar, complete su dirección y su teléfono.</Alert>
-              <Typography>Será redirigido al formulario para completarlo.</Typography>
+              <Typography>Abra el formulario en una nueva pestaña, complételo y vuelva a esta ventana.</Typography>
               <Box sx={{ mt: 'auto' }}>
                 <Button
                   variant="contained"
                   onClick={() => {
+                    window.open('/me', '_blank', 'noopener')
                     setShowProfilePrompt(false)
-                    setWaitingForProfile(false)
-                    navigate('/me')
+                    setWaitingForProfile(true)
                   }}
                 >
                   Completar datos personales
