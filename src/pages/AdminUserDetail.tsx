@@ -24,7 +24,6 @@ import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import MailLockIcon from '@mui/icons-material/MailLock';
 import EditIcon from '@mui/icons-material/Edit';
-import GavelIcon from '@mui/icons-material/Gavel';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { AdminUserRow, UserProfile, UserMeter } from '../api/client';
@@ -232,6 +231,22 @@ export default function AdminUserDetail() {
     }
   }
 
+  async function handleUnsuspend() {
+    if (!user) return;
+    setBusyAction(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await api.post(`/admin/users/${user.id}/unsuspend`);
+      setSuccess('Cuenta reactivada');
+      await load();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || e?.message || 'No se pudo reactivar la cuenta');
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} alignItems="center">
@@ -389,16 +404,27 @@ export default function AdminUserDetail() {
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }}>
               <Typography variant="overline" color="text.secondary">Seguridad</Typography>
               <Box sx={{ flexGrow: 1 }} />
-              <Button
-                size="small"
-                color="error"
-                variant="outlined"
-                startIcon={<GavelIcon />}
-                onClick={() => setSuspendDlgOpen(true)}
-                disabled={busyAction || user.status === 'Suspendido'}
-              >
-                Suspender cuenta
-              </Button>
+              {user.status === 'Suspendido' ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleUnsuspend}
+                  disabled={busyAction}
+                  sx={{ color: '#002120', borderColor: '#002120', '&:hover': { borderColor: '#002120', backgroundColor: 'rgba(0,33,32,0.08)' } }}
+                >
+                  Reactivar cuenta
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setSuspendDlgOpen(true)}
+                  disabled={busyAction}
+                  sx={{ color: '#002120', borderColor: '#002120', '&:hover': { borderColor: '#002120', backgroundColor: 'rgba(0,33,32,0.08)' } }}
+                >
+                  Suspender cuenta
+                </Button>
+              )}
             </Stack>
           </Paper>
 
@@ -506,7 +532,7 @@ export default function AdminUserDetail() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSuspendDlgOpen(false)}>Cancelar</Button>
-          <Button color="error" variant="contained" onClick={handleSuspend} disabled={busyAction}>Suspender</Button>
+          <Button variant="contained" onClick={handleSuspend} disabled={busyAction} sx={{ backgroundColor: '#002120', '&:hover': { backgroundColor: '#001a1c' } }}>Suspender</Button>
         </DialogActions>
       </Dialog>
     </Stack>

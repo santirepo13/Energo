@@ -1357,6 +1357,7 @@ app.get('/api/admin/users/:id/logs', requireAuth, requireAdmin, async (req: expr
       'password_reset_link',
       'admin_update_email',
       'admin_suspend',
+      'admin_unsuspend',
       'admin_meter_transfer',
       'meter_claimed',
       'meter_renamed',
@@ -1515,17 +1516,50 @@ app.post('/api/admin/users/:id/suspend', requireAuth, requireAdmin, async (req: 
     await conn.query('INSERT INTO blocked (user_id, reason, admin_user_id) VALUES (?, ?, ?)', [targetUserId, rsn, adminUserId ?? null]);
     await conn.query('CALL sp_users_update_status_by_name(?, ?)', [targetUserId, 'Suspendido']);
     await conn.commit();
-
-    await logSecurity('admin_suspend', targetName, ip, { user_id: targetUserId, reason: rsn, by_admin: adminUsername });
-    return res.json({ message: 'Cuenta suspendida' });
-  } catch (e: any) {
-    try { await conn.rollback(); } catch {}
-    console.error(e);
-    return res.status(500).json({ error: 'No se pudo suspender la cuenta' });
-  } finally {
-    conn.release();
-  }
+await logSecurity('admin_suspend', targetName, ip, { user_id: targetUserId, reason: rsn, by_admin: adminUsername });
+return res.json({ message: 'Cuenta suspendida' });
+} catch (e: any) {
+try { await conn.rollback(); } catch {}
+console.error(e);
+return res.status(500).json({ error: 'No se pudo suspender la cuenta' });
+} finally {
+conn.release();
+}
 });
+
+app.post('/api/admin/users/:id/unsuspend', requireAuth, requireAdmin, async (req: express.Request, res: express.Response) => {
+const targetUserId = Number(req.params.id);
+const adminUsername = (req.session as any)?.username ?? null;
+const ip = clientIp(req);
+
+if (!targetUserId || !Number.isFinite(targetUserId)) {
+return res.status(400).json({ error: 'Invalid user id' });
+}
+
+const conn = await pool.getConnection();
+try {
+// Block modifications to audit users
+const info = await callFirst<any>(conn, 'sp_users_select_role_status_by_id', [targetUserId]);
+if (!info) return res.status(404).json({ error: 'User not found' });
+const targetRole = (info.role_name ?? null) as string | null;
+if (targetRole === 'audit') return res.status(403).json({ error: 'Cannot modify audit users' });
+
+const u = await callFirst<any>(conn, 'sp_users_get_basic_by_id', [targetUserId]);
+if (!u) return res.status(404).json({ error: 'User not found' });
+const targetName = String(u.username);
+
+await conn.query('CALL sp_users_update_status_by_name(?, ?)', [targetUserId, 'Activo']);
+
+await logSecurity('admin_unsuspend', targetName, ip, { user_id: targetUserId, by_admin: adminUsername });
+return res.json({ message: 'Cuenta reactivada' });
+} catch (e: any) {
+console.error(e);
+return res.status(500).json({ error: 'No se pudo reactivar la cuenta' });
+} finally {
+conn.release();
+}
+});
+
 
 /**
  * Admin: update global cost per kWh
