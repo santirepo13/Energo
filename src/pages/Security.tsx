@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography, Chip } from '@mui/material';
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, TextField, Typography } from '@mui/material';
 import { meChangePassword, meUpdateStatus, meListMeters, meAddMeter, meReleaseMeter, type SelfStatus, type UserMeter } from '../api/client';
 
 export default function SecurityPage() {
@@ -73,6 +73,7 @@ export default function SecurityPage() {
     const serial = (card ?? '').toString().trim();
     if (!serial) return;
     if (!window.confirm('¿Eliminar de su cuenta este medidor? Podrá vincularse a otra cuenta.')) return;
+    setReleasing(serial);
     try {
       await meReleaseMeter(serial);
       setMeters((prev) => prev.filter((m) => m.card_number !== serial));
@@ -80,6 +81,8 @@ export default function SecurityPage() {
       window.dispatchEvent(new Event('auth-changed'));
     } catch (e: any) {
       setMetersError(e?.response?.data?.error || e?.message || 'No se pudo liberar el medidor');
+    } finally {
+      setReleasing(null);
     }
   }
 
@@ -198,14 +201,29 @@ export default function SecurityPage() {
               {addingMeter ? 'Agregando…' : 'Agregar medidor'}
             </Button>
           </Stack>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
+          <Stack spacing={1}>
             {metersLoading && <Typography>Cargando medidores…</Typography>}
             {!metersLoading && meters.map((m) => (
-              <Chip
+              <Stack
                 key={m.card_number}
-                label={`${m.name ? m.name : m.card_number} (${m.card_number})${releasing === m.card_number ? ' (eliminando...)' : ''}`}
-                onDelete={() => handleReleaseMeter(m.card_number)}
-              />
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.04)', borderRadius: 1 }}
+              >
+                <Typography>
+                  {(m.name ? m.name : m.card_number)} ({m.card_number})
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => handleReleaseMeter(m.card_number)}
+                  disabled={releasing === m.card_number}
+                >
+                  {releasing === m.card_number ? 'Eliminando…' : 'Eliminar'}
+                </Button>
+              </Stack>
             ))}
             {!metersLoading && meters.length === 0 && (
               <Typography color="text.secondary">Sin medidores registrados.</Typography>

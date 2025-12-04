@@ -451,9 +451,6 @@ export default function Dashboard() {
               <Typography variant="h5">{formatKwh(card.current_kwh)}</Typography>
 
               <Divider sx={{ my: 2 }} />
-              <Button variant="outlined" color="error" onClick={handleReleaseSelected} disabled={releasingMeter}>
-                {releasingMeter ? 'Eliminando…' : 'Eliminar de mi cuenta'}
-              </Button>
             </CardContent>
           </Card>
 
