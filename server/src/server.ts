@@ -60,13 +60,19 @@ async function testDbConnection() {
 }
 void testDbConnection();
 
-// Security headers: prevent MIME type sniffing and clickjacking for all responses (incl. CORS preflight)
+// Security headers: baseline CSP and anti-clickjacking for all responses (incl. CORS preflight)
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  
+
   // Anti-clickjacking: block all framing
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+
+  // Strict baseline CSP for API responses and any accidental HTML
+  // Blocks script/style execution and resource loads; allows no embedding
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; form-action 'none'"
+  );
   next();
 });
 
