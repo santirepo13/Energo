@@ -323,7 +323,16 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
 
      // If a card number was provided, only block when it's already assigned to a user.
      if (card) {
-       const cr = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+       let cr: any = null;
+       try {
+         cr = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+       } catch (e: any) {
+         if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+           cr = await findEnergyCardByNumberRaw(conn, card);
+         } else {
+           throw e;
+         }
+       }
        if (cr && cr.user_id != null) {
          await conn.rollback();
          await logSecurity('register_duplicate_card', username, ip, { card_number: card });
