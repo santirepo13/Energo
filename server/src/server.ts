@@ -17,6 +17,7 @@ import cors from 'cors';
 import session from 'express-session';
 import bcrypt from 'bcryptjs';
 import { createPool, Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import crypto from 'crypto';
 
 const app = express();
 // Hide Express signature header
@@ -852,13 +853,62 @@ app.get('/api/dashboard', requireAuth, async (req: express.Request, res: express
   }
 });
 
-function generatePin15(): string {
-  let s = '';
-  for (let i = 0; i < 15; i++) {
-    s += Math.floor(Math.random() * 10).toString();
+/**
+ * STS-style 20-digit token generation bound to a specific meter.
+ * - 19-digit body derived from HMAC-SHA256(card_number-keyed payload) + 1 Luhn check digit
+ * - Payload encodes token type, amount (in cents), STS epoch days, and a nonce
+ * - Meter binding via per-meter key derived from STS_MASTER_KEY and card_number
+ */
+const STS_BASE_DATE = new Date(Date.UTC(1993, 0, 1)); // 1993-01-01
+
+function daysSinceStsEpoch(d: Date): number {
+  const ms = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - STS_BASE_DATE.getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+}
+
+function luhnCheckDigit(bodyDigits: string): string {
+  // bodyDigits length should be 19
+  let sum = 0;
+  for (let i = bodyDigits.length - 1, alt = 0; i >= 0; i--, alt ^= 1) {
+    let n = bodyDigits.charCodeAt(i) - 48; // '0' -> 48
+    if (alt === 1) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
   }
-  if (s.length < 15) s = s.padStart(15, '0');
-  return s;
+  const check = (10 - (sum % 10)) % 10;
+  return String(check);
+}
+
+function deriveMeterKey(cardNumber: string): Buffer {
+  const master = process.env.STS_MASTER_KEY || process.env.SESSION_SECRET || 'insecure-dev-sts-key';
+  return crypto.createHmac('sha256', master).update(String(cardNumber)).digest().subarray(0, 16); // AES-128 equivalent key material
+}
+
+function generateSts20Token(cardNumber: string, amountCOP: number, _kwh: number): string {
+  const key = deriveMeterKey(cardNumber);
+  const tokenType = 0x01; // credit token
+  const amountCents = Math.max(0, Math.round(Number(amountCOP) * 100)); // COP cents
+  const days = daysSinceStsEpoch(new Date());
+  const nonce = crypto.randomBytes(2).readUInt16BE(0);
+
+  // Payload: [1 byte type][4 bytes amount][2 bytes days][2 bytes nonce] = 9 bytes
+  const payload = Buffer.alloc(9);
+  payload.writeUInt8(tokenType, 0);
+  payload.writeUInt32BE(amountCents >>> 0, 1);
+  payload.writeUInt16BE(days & 0xffff, 5);
+  payload.writeUInt16BE(nonce, 7);
+
+  // HMAC with per-meter key binds token to the meter
+  const mac = crypto.createHmac('sha256', key).update(payload).digest(); // 32 bytes
+
+  // 19-digit body from MAC truncation (mod 10^19), + Luhn check to reach 20 digits total
+  const first16 = mac.subarray(0, 16); // 128 bits
+  const big = BigInt('0x' + first16.toString('hex'));
+  const body = (big % (10n ** 19n)).toString().padStart(19, '0');
+  const check = luhnCheckDigit(body);
+  return body + check; // 20 digits
 }
 
 app.post('/api/recharge', requireAuth, async (req: express.Request, res: express.Response) => {
@@ -933,7 +983,7 @@ app.post('/api/recharge', requireAuth, async (req: express.Request, res: express
       'UPDATE energy_cards SET current_balance = ?, current_kwh = ?, last_recharge = CURRENT_TIMESTAMP WHERE user_id = ? AND card_number = ?',
       [newBalance, newKwh, userId, card.card_number]
     );
-    const pin = generatePin15();
+    const pin = generateSts20Token(card.card_number, amountCOP, kwhVal);
     await conn.execute(
       'INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh) VALUES (?, ?, ?, ?, ?)',
       [userId, card.card_number, pin, amountCOP, kwhVal]
