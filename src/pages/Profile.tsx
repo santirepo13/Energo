@@ -151,6 +151,13 @@ export default function ProfilePage() {
       if (window.opener && !window.opener.closed) {
         try { window.opener.postMessage('profile-updated', '*'); } catch {}
       }
+      // Cross-tab signals
+      try { localStorage.setItem('energo-profile-updated', String(Date.now())); } catch {}
+      try {
+        const bc = new BroadcastChannel('energo');
+        bc.postMessage('profile-updated');
+        bc.close();
+      } catch {}
       window.dispatchEvent(new Event('auth-changed'));
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el perfil');

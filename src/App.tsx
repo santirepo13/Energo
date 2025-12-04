@@ -86,18 +86,105 @@ function App() {
       } catch {}
     })()
     const onMsg = (e: MessageEvent) => {
-      if ((e as any)?.data === 'profile-updated') {
-        setWaitingForProfile(false)
-        setShowProfilePrompt(false)
-        navigate('/dashboard', { replace: true })
+      const msg = (e as any)?.data
+      if (msg === 'profile-updated' || msg === 'profile-filled') {
+        ;(async () => {
+          try {
+            const pr = await meGetProfile()
+            if (pr.personal_data_filled === true) {
+              setWaitingForProfile(false)
+              setShowProfilePrompt(false)
+              navigate('/dashboard', { replace: true })
+            }
+          } catch {}
+        })()
       }
     }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'energo-profile-updated' || e.key === 'energo-profile-filled') {
+        ;(async () => {
+          try {
+            const pr = await meGetProfile()
+            if (pr.personal_data_filled === true) {
+              setWaitingForProfile(false)
+              setShowProfilePrompt(false)
+              navigate('/dashboard', { replace: true })
+            }
+          } catch {}
+        })()
+      }
+    }
+    // BroadcastChannel: robust cross-tab signal
+    let bc: BroadcastChannel | null = null
+    try {
+      bc = new BroadcastChannel('energo')
+      bc.onmessage = (ev: MessageEvent) => {
+        const data: any = (ev as any)?.data ?? (ev as any)
+        if (data === 'profile-updated' || data?.type === 'profile-updated') {
+          setWaitingForProfile(false)
+          setShowProfilePrompt(false)
+          navigate('/dashboard', { replace: true })
+        }
+      }
+    } catch {}
     window.addEventListener('message', onMsg)
+    window.addEventListener('storage', onStorage)
     return () => {
       mounted = false
       window.removeEventListener('message', onMsg)
+      window.removeEventListener('storage', onStorage)
+      try { (bc as any)?.close?.() } catch {}
     }
   }, [authenticated, location.pathname, navigate])
+
+  // Poll + focus/visibility re-check while esperando datos personales
+  useEffect(() => {
+    if (authenticated !== true || !waitingForProfile) return
+    let cancelled = false
+    const check = async () => {
+      try {
+        const pr = await meGetProfile()
+        if (cancelled) return
+        if (pr.personal_data_filled === true) {
+          setWaitingForProfile(false)
+          setShowProfilePrompt(false)
+          navigate('/dashboard', { replace: true })
+        }
+      } catch {}
+    }
+    const id = window.setInterval(check, 3000)
+    check()
+    const onFocus = () => { check() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [authenticated, waitingForProfile, navigate])
+
+  // Fallback: poll while waiting to detect when personal data is filled
+  useEffect(() => {
+    if (authenticated !== true || !waitingForProfile) return
+    let cancelled = false
+    const check = async () => {
+      try {
+        const pr = await meGetProfile()
+        if (cancelled) return
+        const filled = pr.personal_data_filled === true
+        if (filled) {
+          setWaitingForProfile(false)
+          setShowProfilePrompt(false)
+          navigate('/dashboard', { replace: true })
+        }
+      } catch {}
+    }
+    const id = setInterval(check, 3000)
+    check()
+    return () => { cancelled = true; clearInterval(id) }
+  }, [authenticated, waitingForProfile, navigate])
 
   async function handleLogout() {
     try {
@@ -214,7 +301,7 @@ function App() {
                 <Button
                   variant="contained"
                   onClick={() => {
-                    window.open('/me', '_blank', 'noopener')
+                    window.open('/me', '_blank')
                     setShowProfilePrompt(false)
                     setWaitingForProfile(true)
                   }}
