@@ -87,17 +87,29 @@ async function selectLoginByUsernameRaw(conn: any, username: string) {
   return row;
 }
 
-// Collation-safe raw fallback for duplicate check in register when SP collation mismatches
-async function findUserIdByUsernameOrEmailRaw(conn: any, username: string, email: string) {
-  const [rows]: any = await conn.query(
-    'SELECT id FROM users ' +
-    'WHERE username = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
-    '   OR email    = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
-    'LIMIT 1',
-    [username, email]
-  );
-  return Array.isArray(rows) && rows.length ? rows[0] : null;
-}
+ // Collation-safe raw fallback for duplicate check in register when SP collation mismatches
+ async function findUserIdByUsernameOrEmailRaw(conn: any, username: string, email: string) {
+   const [rows]: any = await conn.query(
+     'SELECT id FROM users ' +
+     'WHERE username = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
+     '   OR email    = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
+     'LIMIT 1',
+     [username, email]
+   );
+   return Array.isArray(rows) && rows.length ? rows[0] : null;
+ }
+ 
+ // Collation-safe raw fallback for energy card by card_number
+ async function findEnergyCardByNumberRaw(conn: any, cardNumber: string) {
+   const [rows]: any = await conn.query(
+     'SELECT id, user_id, card_number, name, current_balance, current_kwh, last_recharge, released, released_by_user_id, released_at ' +
+     'FROM energy_cards ' +
+     'WHERE card_number = CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci ' +
+     'LIMIT 1',
+     [cardNumber]
+   );
+   return Array.isArray(rows) && rows.length ? rows[0] : null;
+ }
 // Test DB connection on startup and log a clear status (non-fatal in dev)
 async function testDbConnection() {
   try {
@@ -365,7 +377,16 @@ app.post('/api/register', async (req: express.Request, res: express.Response) =>
      // Link or create energy card if a non-empty normalized `card` was provided
      if (card) {
        try {
-         const er = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+         let er: any = null;
+         try {
+           er = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+         } catch (e: any) {
+           if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+             er = await findEnergyCardByNumberRaw(conn, card);
+           } else {
+             throw e;
+           }
+         }
          if (er) {
            if (er.user_id == null) {
              await conn.query('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [Number(er.id), user_id, null]);
@@ -1318,7 +1339,16 @@ app.post('/api/admin/users/:id/meters/link', requireAuth, requireAdmin, async (r
     const targetName = String(targetU.username);
     await conn.beginTransaction();
 
-    const found = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+    let found: any = null;
+    try {
+      found = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+    } catch (e: any) {
+      if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+        found = await findEnergyCardByNumberRaw(conn, card);
+      } else {
+        throw e;
+      }
+    }
     if (found) {
       const currentUserId = found.user_id == null ? null : Number(found.user_id);
       if (currentUserId == null) {
@@ -1821,7 +1851,16 @@ app.post('/api/me/meters', requireAuth, async (req: express.Request, res: expres
     await conn.beginTransaction();
 
     // If the meter exists and is released (user_id IS NULL), claim it.
-    const foundRow = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+    let foundRow: any = null;
+    try {
+      foundRow = await callFirst<any>(conn, 'sp_energy_cards_find_by_card_number', [card]);
+    } catch (e: any) {
+      if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
+        foundRow = await findEnergyCardByNumberRaw(conn, card);
+      } else {
+        throw e;
+      }
+    }
 
     if (foundRow) {
       const r = foundRow as any;
