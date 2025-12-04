@@ -150,6 +150,12 @@ function App() {
           <Route path="/reactivar" element={<PausaRestorePage />} />
         </Routes>
       </Container>
+
+      <Box component="footer" sx={{ py: 2, textAlign: 'center', color: '#666' }}>
+        <Typography variant="body2">
+          Proyecto Educativo por Santiago Restrepo Nivel Explorador
+        </Typography>
+      </Box>
     </ThemeProvider>
   )
 }
