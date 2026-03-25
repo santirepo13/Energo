@@ -15,13 +15,13 @@ export type RegisterRequest = {
   password: string;
   email: string;
   card_number: string;
-  employee_code?: string; // optional employee code for admin/audit registration
+  employee_code?: string; 
 };
 
 export type RechargeRequest = {
   amount?: number; // COP
   kwh?: number;
-  card_number?: string; // optional: target a specific meter
+  card_number?: string; 
 };
 
 export type UserInfo = {
@@ -32,7 +32,7 @@ export type UserInfo = {
 
 export type DashboardResponse = {
   current_user?: UserInfo;
-  // Back-compat: first card (may be null)
+  // Back-compat: first card 
   card: {
     card_number: string;
     name?: string | null;
