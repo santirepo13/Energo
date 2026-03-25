@@ -55,7 +55,7 @@ export class App {
     const dbPool = this.dbConnection.getPool();
     const authMiddleware = createAuthMiddleware({ pool: dbPool });
 
-    const { AuthService } = require('./services/auth.service');
+    const { AuthService } = require('./services/authService');
     const { UserService } = require('./services/user.service');
     const { EnergyCardService } = require('./services/energy-card.service');
     const { RechargeService } = require('./services/recharge.service');
