@@ -1,5 +1,5 @@
 import { validationSchemas } from '../config/validation';
-import Joi from 'joi';
+
 
 export const createValidationMiddleware = () => {
   return {

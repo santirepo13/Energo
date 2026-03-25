@@ -56,9 +56,9 @@ export class App {
     const authMiddleware = createAuthMiddleware({ pool: dbPool });
 
     const { AuthService } = require('./services/authService');
-    const { UserService } = require('./services/user.service');
-    const { EnergyCardService } = require('./services/energy-card.service');
-    const { RechargeService } = require('./services/recharge.service');
+    const { UserService } = require('./services/userService');
+    const { EnergyCardService } = require('./services/energyCardService');
+    const { RechargeService } = require('./services/rechargeService');
 
     const authRoutes = createAuthRoutes(new AuthService(dbPool), authMiddleware);
     const userRoutes = createUserRoutes(new UserService(dbPool), authMiddleware);
