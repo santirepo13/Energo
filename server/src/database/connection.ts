@@ -1,9 +1,9 @@
-import { Pool } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
 import { DatabaseConfig } from '../types/types';
 import { createDatabasePool, normalizeConnectionCollation, loadDatabaseConfig } from '../config/database';
 
 export class DatabaseConnection {
-  private pool: Pool;
+  private pool: mysql.Pool;
 
   constructor() {
     const config = loadDatabaseConfig();
@@ -11,7 +11,7 @@ export class DatabaseConnection {
     normalizeConnectionCollation(this.pool);
   }
 
-  getPool(): Pool {
+  getPool(): mysql.Pool {
     return this.pool;
   }
 

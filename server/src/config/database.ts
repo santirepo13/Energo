@@ -1,4 +1,4 @@
-import { Pool } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
 
 export interface DatabaseConfig {
   host: string;
@@ -12,8 +12,8 @@ export interface DatabaseConfig {
   queueLimit: number;
 }
 
-export const createDatabasePool = (config: DatabaseConfig): Pool => {
-  return new Pool({
+export const createDatabasePool = (config: DatabaseConfig): mysql.Pool => {
+  return mysql.createPool({
     host: config.host,
     user: config.user,
     password: config.password,
@@ -26,7 +26,7 @@ export const createDatabasePool = (config: DatabaseConfig): Pool => {
   });
 };
 
-export const normalizeConnectionCollation = (pool: Pool): void => {
+export const normalizeConnectionCollation = (pool: mysql.Pool): void => {
   const __origGetConnection = (pool as any).getConnection.bind(pool);
   (pool as any).getConnection = async () => {
     const conn = await __origGetConnection();
