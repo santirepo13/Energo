@@ -34,7 +34,7 @@ import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
 import type { DashboardResponse, AuditMetrics } from '../api/client';
-import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice, meAddMeter, meReleaseMeter } from '../api/client';
+import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
 
 const currencyCOP = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -98,11 +98,7 @@ export default function Dashboard() {
     return map;
   }, [data]);
 
-  const [newMeterSerial, setNewMeterSerial] = useState<string>('');
-  const [addingMeter, setAddingMeter] = useState(false);
-  const [releasingMeter, setReleasingMeter] = useState(false);
-  const [meterErr, setMeterErr] = useState<string | null>(null);
-  const [meterMsg, setMeterMsg] = useState<string | null>(null);
+  
   
 
   // Audit state
@@ -258,58 +254,7 @@ export default function Dashboard() {
   }
 
   // Add a new meter from dashboard
-  async function handleAddMeter(e: React.FormEvent) {
-    e.preventDefault();
-    setMeterErr(null);
-    setMeterMsg(null);
-    const serial = newMeterSerial.trim();
-    if (!serial) {
-      setMeterErr('Ingrese un serial de medidor');
-      return;
-    }
-    setAddingMeter(true);
-    try {
-      const res = await meAddMeter(serial);
-      setData((prev) => {
-        if (!prev) return prev;
-        const exists = (prev.cards ?? []).some((c) => c.card_number === res.meter.card_number);
-        const nextCards = exists ? (prev.cards ?? []) : [res.meter, ...(prev.cards ?? [])];
-        return { ...prev, cards: nextCards };
-      });
-      setSelectedCardNumber(res.meter.card_number);
-      setNewMeterSerial('');
-      setMeterMsg('Medidor agregado');
-    } catch (e: any) {
-      setMeterErr(e?.response?.data?.error || e?.message || 'No se pudo agregar el medidor');
-    } finally {
-      setAddingMeter(false);
-    }
-  }
-
-  // Release currently selected meter (unlink from account)
-  async function handleReleaseSelected() {
-    setMeterErr(null);
-    setMeterMsg(null);
-    const serial = selectedCardNumber?.trim() || '';
-    if (!serial) return;
-    if (!window.confirm('¿Eliminar de su cuenta este medidor? Podrá vincularse a otra cuenta.')) return;
-    setReleasingMeter(true);
-    try {
-      await meReleaseMeter(serial);
-      setData((prev) => {
-        if (!prev) return prev;
-        const nextCards = (prev.cards ?? []).filter((c) => c.card_number !== serial);
-        const nextCard = nextCards.length > 0 ? nextCards[0] : null;
-        return { ...prev, cards: nextCards, card: nextCard };
-      });
-      setSelectedCardNumber(null);
-      setMeterMsg('Medidor liberado');
-    } catch (e: any) {
-      setMeterErr(e?.response?.data?.error || e?.message || 'No se pudo liberar el medidor');
-    } finally {
-      setReleasingMeter(false);
-    }
-  }
+  
   
   if (loading) {
     return (

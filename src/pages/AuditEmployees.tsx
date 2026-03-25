@@ -23,14 +23,13 @@ import PeopleIcon from '@mui/icons-material/People';
 import { useNavigate } from 'react-router-dom';
 import {
   auditListEmployees,
-  auditUpdateStatus,
   auditListEmployeeCodes,
   auditGenerateEmployeeCode,
 } from '../api/client';
 import type { AdminUserRow, EmployeeCodeRow } from '../api/client';
 
 
-const ADMIN_STATUS_OPTIONS = ['Activo', 'Deshabilitado'] as const;
+
 
 export default function AuditEmployeesPage() {
   const navigate = useNavigate();
@@ -38,8 +37,7 @@ export default function AuditEmployeesPage() {
   const [employees, setEmployees] = useState<AdminUserRow[]>([]);
   const [empError, setEmpError] = useState<string | null>(null);
 
-  const [savingStatus, setSavingStatus] = useState<Record<number, boolean>>({});
-  const [statusError, setStatusError] = useState<string | null>(null);
+
 
   const [loadingCodes, setLoadingCodes] = useState(true);
   const [codes, setCodes] = useState<EmployeeCodeRow[]>([]);
@@ -81,18 +79,7 @@ export default function AuditEmployeesPage() {
     void loadCodes();
   }, []);
 
-  async function handleChangeStatus(userId: number, status: typeof ADMIN_STATUS_OPTIONS[number]) {
-    setSavingStatus((p) => ({ ...p, [userId]: true }));
-    setStatusError(null);
-    try {
-      await auditUpdateStatus(userId, status);
-      setEmployees((prev) => prev.map((u) => (u.id === userId ? { ...u, status } : u)));
-    } catch (e: any) {
-      setStatusError(e?.response?.data?.error || e?.message || 'No se pudo actualizar el estado');
-    } finally {
-      setSavingStatus((p) => ({ ...p, [userId]: false }));
-    }
-  }
+  
 
   async function handleGenerateCode() {
     setGenerating(true);

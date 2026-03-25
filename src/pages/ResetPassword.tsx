@@ -24,7 +24,6 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [pw, setPw] = useState('');
@@ -47,7 +46,6 @@ export default function ResetPasswordPage() {
         const res = await api.get('/password/reset/validate', { params: { token } });
         if (!mounted) return;
         setUsername(res.data?.username || '');
-        setEmail(res.data?.email || '');
         setValid(true);
       } catch (e: any) {
         if (!mounted) return;

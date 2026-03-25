@@ -1,0 +1,54 @@
+import { Request, Response, NextFunction } from 'express';
+
+export interface SecurityConfig {
+  clientOrigin: string;
+  sessionSecret: string;
+  corsCredentials: boolean;
+}
+
+export const createSecurityMiddleware = (config: SecurityConfig) => {
+  return {
+    securityHeaders: (req: Request, res: Response, next: NextFunction) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; form-action 'none'");
+      next();
+    },
+    
+    blockHiddenFiles: (req: Request, res: Response, next: NextFunction) => {
+      let p = req.path || '';
+      try { p = decodeURIComponent(p); } catch { /* ignore malformed encodings */ }
+      
+      if (p.startsWith('/.well-known/')) return next();
+      if (/(?:^|\/)\.[^/]/.test(p)) {
+        return res.status(404).end();
+      }
+      next();
+    },
+    
+    cors: () => {
+      return {
+        origin: config.clientOrigin,
+        credentials: config.corsCredentials,
+      };
+    },
+  };
+};
+
+export const getClientIP = (req: Request): string => {
+  return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+};
+
+export const logSecurityEvent = async (pool: any, eventType: string, username: string | null, ip: string, details: any) => {
+  try {
+    const conn = await pool.getConnection();
+    try {
+      const payload = typeof details === 'string' ? details : JSON.stringify(details);
+      await conn.query('CALL sp_security_logs_insert(?, ?, ?, ?)', [eventType, username, ip, payload]);
+    } finally {
+      conn.release();
+    }
+  } catch (e) {
+    console.error('Failed to log security event', e);
+  }
+};

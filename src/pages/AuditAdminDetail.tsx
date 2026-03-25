@@ -40,7 +40,6 @@ export default function AuditAdminDetail() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [user, setUser] = useState<AdminUserRow | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   // Profile form state (auditor can edit all fields)
   const [saving, setSaving] = useState(false);
@@ -68,7 +67,6 @@ export default function AuditAdminDetail() {
       const res = await api.get(`/audit/admins/${userId}`);
       const d = res.data as DetailResponse;
       setUser(d.user);
-      setProfile(d.profile);
 
       const p = d.profile;
       setForm({
