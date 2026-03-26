@@ -1,3 +1,5 @@
+console.log('Loading user model');
+
 export interface User {
   id: number;
   username: string;

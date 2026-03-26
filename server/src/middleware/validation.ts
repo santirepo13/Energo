@@ -1,5 +1,7 @@
 import { validationSchemas } from '../config/validation';
 
+console.log('Loading validation middleware');
+
 
 export const createValidationMiddleware = () => {
   return {

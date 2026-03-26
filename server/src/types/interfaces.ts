@@ -1,3 +1,5 @@
+console.log('Loading types interfaces');
+
 export interface User {
   id: number;
   username: string;

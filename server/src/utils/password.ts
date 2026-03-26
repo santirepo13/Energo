@@ -1,12 +1,8 @@
 import bcrypt from 'bcryptjs';
 
-export interface PasswordUtils {
-  hashPassword: (password: string) => Promise<string>;
-  comparePassword: (password: string, hash: string) => Promise<boolean>;
-  validatePasswordPolicy: (password: string, username: string, email: string) => string | null;
-}
+console.log('Loading password utility');
 
-export class PasswordUtils implements PasswordUtils {
+export class PasswordUtils {
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 10);
   }

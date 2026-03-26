@@ -13,6 +13,8 @@ import { createEnergyCardRoutes } from './routes/energyCardRoutes';
 import { createRechargeRoutes } from './routes/rechargeRoutes';
 import { loadAppConfig } from './config/config';
 
+console.log('Loading app');
+
 export class App {
   private app: express.Application;
   private dbConnection: DatabaseConnection;
@@ -22,6 +24,7 @@ export class App {
     this.dbConnection = new DatabaseConnection();
     this.initializeMiddleware();
     this.initializeRoutes();
+    this.initializeErrorHandling();
   }
 
   private initializeMiddleware(): void {
@@ -46,9 +49,6 @@ export class App {
     }));
     const rateLimitMiddleware = createRateLimitMiddleware({windowMs: 15 * 60 * 1000, max: 100, message: 'Too many requests from this IP'});
     this.app.use(rateLimitMiddleware.rateLimit);
-    const errorHandlerMiddleware = createErrorHandlerMiddleware();
-    this.app.use(errorHandlerMiddleware.errorHandler);
-    this.app.use(errorHandlerMiddleware.notFoundHandler);
   }
 
   private initializeRoutes(): void {
@@ -79,12 +79,36 @@ export class App {
     const config = loadAppConfig();
     const port = config.port;
     
+    console.log('Starting server...');
+    console.log('Config:', config);
+    
     this.app.listen(port, () => {
       console.log(`Server running on port ${port}`);
+      console.log('Available routes:');
+      console.log('  GET /health');
+      console.log('  POST /api/auth/login');
+      console.log('  POST /api/auth/register');
+      console.log('  POST /api/auth/logout');
+      console.log('  GET /api/me/profile');
+      console.log('  PUT /api/me/profile');
+      console.log('  POST /api/me/password-change');
+      console.log('  POST /api/me/status');
+      console.log('  GET /api/me/meters');
+      console.log('  POST /api/me/meters');
+      console.log('  DELETE /api/me/meters/:card_number');
+      console.log('  PATCH /api/me/meters/:card_number');
+      console.log('  POST /api/recharge');
+      console.log('  GET /api/recharge/history');
     });
   }
 
   async stop(): Promise<void> {
     await this.dbConnection.close();
+  }
+
+  private initializeErrorHandling(): void {
+    const errorHandlerMiddleware = createErrorHandlerMiddleware();
+    this.app.use(errorHandlerMiddleware.errorHandler);
+    this.app.use(errorHandlerMiddleware.notFoundHandler);
   }
 }

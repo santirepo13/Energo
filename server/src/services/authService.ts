@@ -2,14 +2,9 @@ import bcrypt from 'bcryptjs';
 import { Pool } from 'mysql2/promise';
 import { User, UserProfile, UserWithDetails } from '../models/userModel';
 
-export interface AuthService {
-  login: (username: string, password: string) => Promise<UserWithDetails | null>;
-  register: (userData: any) => Promise<{ userId: number; cardNumber: string | null }>;
-  changePassword: (userId: number, currentPassword: string, newPassword: string) => Promise<void>;
-  validatePasswordPolicy: (password: string, username: string, email: string) => string | null;
-}
+console.log('Loading auth service');
 
-export class AuthService implements AuthService {
+export class AuthService {
   constructor(private pool: Pool) {}
 
   async login(username: string, password: string): Promise<UserWithDetails | null> {

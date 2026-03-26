@@ -1,3 +1,5 @@
+console.log('Loading recharge model');
+
 export interface RechargePin {
   id: number;
   user_id: number;

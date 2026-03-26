@@ -1,10 +1,8 @@
 import crypto from 'crypto';
 
-export interface PinGenerator {
-  generateSts20Token: (cardNumber: string, amountCOP: number, kwh: number) => string;
-}
+console.log('Loading pin generator utility');
 
-export class PinGenerator implements PinGenerator {
+export class PinGenerator {
   private readonly STS_BASE_DATE = new Date(Date.UTC(1993, 0, 1));
 
   generateSts20Token(cardNumber: string, amountCOP: number, kwh: number): string {

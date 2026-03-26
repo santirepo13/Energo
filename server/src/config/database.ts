@@ -39,7 +39,7 @@ export const normalizeConnectionCollation = (pool: mysql.Pool): void => {
 };
 
 export const loadDatabaseConfig = (): DatabaseConfig => {
-  return {
+  const config = {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
@@ -50,4 +50,7 @@ export const loadDatabaseConfig = (): DatabaseConfig => {
     connectionLimit: 10,
     queueLimit: 0,
   };
+  
+  console.log('Loading database config:', config);
+  return config;
 };

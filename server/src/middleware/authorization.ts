@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
+console.log('Loading authorization middleware');
+
 export interface AuthorizationMiddlewareOptions {
   allowedRoles: string[];
   allowedStatuses?: string[];

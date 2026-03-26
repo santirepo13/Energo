@@ -3,6 +3,8 @@ import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { AuthService } from '../services/authService';
 
+console.log('Loading auth routes');
+
 export const createAuthRoutes = (authService: AuthService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();
 

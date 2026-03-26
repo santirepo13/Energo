@@ -1,5 +1,7 @@
 import Joi from 'joi';
 
+console.log('Loading validation schemas');
+
 export const validationSchemas = {
   register: Joi.object({
     username: Joi.string().min(3).max(50).required(),

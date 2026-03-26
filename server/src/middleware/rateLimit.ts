@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
+console.log('Loading rate limit middleware');
+
 export interface RateLimitOptions {
   windowMs: number;
   max: number;

@@ -1,12 +1,10 @@
 import { Pool } from 'mysql2/promise';
 import { RechargePin, RechargeTransaction } from '../models/rechargeModel';
+import * as crypto from 'crypto';
 
-export interface RechargeService {
-  recharge: (userId: number, amount: number, kwh: number, cardNumber: string) => Promise<{ pin: string; balance: number; kwh: number }>;
-  getRechargeHistory: (userId: number) => Promise<RechargeTransaction[]>;
-}
+console.log('Loading recharge service');
 
-export class RechargeService implements RechargeService {
+export class RechargeService {
   constructor(private pool: Pool) {}
 
   async recharge(userId: number, amount: number, kwh: number, cardNumber: string): Promise<{ pin: string; balance: number; kwh: number }> {
@@ -99,6 +97,7 @@ export class RechargeService implements RechargeService {
   }
 
   private daysSinceStsEpoch(d: Date): number {
+    const STS_BASE_DATE = new Date(Date.UTC(1993, 0, 1));
     const ms = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - STS_BASE_DATE.getTime();
     return Math.max(0, Math.floor(ms / 86400000));
   }

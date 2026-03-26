@@ -1,3 +1,5 @@
+console.log('Loading energy card model');
+
 export interface EnergyCard {
   id: number;
   user_id: number | null;

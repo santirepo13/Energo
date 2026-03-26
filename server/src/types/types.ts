@@ -1,3 +1,5 @@
+console.log('Loading types types');
+
 export interface DatabaseConfig {
   host: string;
   user: string;

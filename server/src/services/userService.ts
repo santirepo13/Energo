@@ -1,6 +1,8 @@
 import { Pool } from 'mysql2/promise';
 import { User, UserProfile, UserFlag } from '../models/userModel';
 
+console.log('Loading user service');
+
 export class UserService {
   constructor(private pool: Pool) {}
 
@@ -133,7 +135,7 @@ export class UserService {
   }
 
   private async updatePersonalDataFlag(conn: any, userId: number, profileData: any): Promise<void> {
-    const personalDataFilled = profileData.tipo_identificacion && profileData.numero_identificacion && profileData.nombres && profileData.apellidos;
+    const personalDataFilled = profileData.tipo_identificacion && profileData.numero_identificacion && profileData.primer_nombre && profileData.primer_apellido;
     await conn.query(
       'INSERT INTO user_flags (user_id, personal_data_filled) VALUES (?, ?) ON DUPLICATE KEY UPDATE personal_data_filled = ?',
       [userId, personalDataFilled, personalDataFilled]
@@ -152,16 +154,24 @@ export class UserService {
     const user = await this.getUserPasswordHash(conn, userId);
     if (!user) return false;
     
-    const passwordUtils = new (await import('../utils/password')).PasswordUtils();
-    return passwordUtils.comparePassword(currentPassword, user.password_hash);
+    const bcrypt = await import('bcryptjs');
+    return bcrypt.compare(currentPassword, user.password_hash);
   }
 
   private async hashPassword(password: string): Promise<string> {
-    const passwordUtils = new (await import('../utils/password')).PasswordUtils();
-    return passwordUtils.hashPassword(password);
+    const bcrypt = await import('bcryptjs');
+    return bcrypt.hash(password, 10);
   }
 
   
+
+  private async hasDocumentChange(conn: any, userId: number): Promise<boolean> {
+    const [rows]: any = await conn.query(
+      'SELECT document_change_used FROM user_flags WHERE user_id = ? LIMIT 1',
+      [userId]
+    );
+    return Array.isArray(rows) && rows.length ? Boolean(rows[0].document_change_used) : false;
+  }
 
   private async getStatusIdByName(conn: any, status: string): Promise<any> {
     const [rows]: any = await conn.query(
@@ -171,11 +181,4 @@ export class UserService {
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
 
-  private async hasDocumentChange(conn: any, userId: number): Promise<boolean> {
-    const [rows]: any = await conn.query(
-      'SELECT document_change_used FROM user_flags WHERE user_id = ? LIMIT 1',
-      [userId]
-    );
-    return Array.isArray(rows) && rows.length ? Boolean(rows[0].document_change_used) : false;
-  }
 } 

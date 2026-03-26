@@ -1,11 +1,8 @@
 import { Pool } from 'mysql2/promise';
 
-export interface SecurityService {
-  logEvent: (eventType: string, username: string | null, ip: string, details: any) => Promise<void>;
-  validatePasswordPolicy: (password: string, username: string, email: string) => string | null;
-}
+console.log('Loading security service');
 
-export class SecurityService implements SecurityService {
+export class SecurityService {
   constructor(private pool: Pool) {}
 
   async logEvent(eventType: string, username: string | null, ip: string, details: any): Promise<void> {

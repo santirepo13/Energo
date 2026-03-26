@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
+console.log('Loading error handler middleware');
+
 export const createErrorHandlerMiddleware = () => {
   return {
     errorHandler: (err: any, req: Request, res: Response, next: NextFunction) => {

@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { logSecurityEvent } from '../config/security';
 import { Pool } from 'mysql2/promise';
+import { getClientIP } from '../config/security';
+
+console.log('Loading auth middleware');
 
 export interface AuthMiddlewareOptions {
   pool: Pool;
@@ -39,23 +42,71 @@ export const createAuthMiddleware = ({ pool }: AuthMiddlewareOptions) => {
     },
     
     requireAdmin: async (req: Request, res: Response, next: NextFunction) => {
-      const auth = await this.requireAuth(req, res, () => Promise.resolve());
-      if (auth instanceof Response) return auth;
-      
-      if ((req as any).user?.role !== 'admin') {
-        return res.status(403).json({ error: 'Admin only' });
+      const userId = (req.session as any)?.userId as number | undefined;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
       }
-      next();
+      
+      try {
+        const conn = await pool.getConnection();
+        try {
+          const info = await callFirst(conn, 'sp_users_select_role_status_by_id', [userId]);
+          if (!info) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+          
+          const status = (info.status_name ?? null) as string | null;
+          if (status === 'Deshabilitado' || status === 'Suspendido') {
+            return res.status(403).json({ error: `Cuenta ${status}. Contacte al administrador.` });
+          }
+          
+          if (info.role_name !== 'admin') {
+            return res.status(403).json({ error: 'Admin only' });
+          }
+          
+          (req as any).user = { id: userId, role: info.role_name, status };
+          next();
+        } finally {
+          conn.release();
+        }
+      } catch (e) {
+        console.error('Admin auth check failed', e);
+        return res.status(500).json({ error: 'Admin auth check failed' });
+      }
     },
     
     requireAudit: async (req: Request, res: Response, next: NextFunction) => {
-      const auth = await this.requireAuth(req, res, () => Promise.resolve());
-      if (auth instanceof Response) return auth;
-      
-      if ((req as any).user?.role !== 'audit') {
-        return res.status(403).json({ error: 'Audit only' });
+      const userId = (req.session as any)?.userId as number | undefined;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
       }
-      next();
+      
+      try {
+        const conn = await pool.getConnection();
+        try {
+          const info = await callFirst(conn, 'sp_users_select_role_status_by_id', [userId]);
+          if (!info) {
+            return res.status(401).json({ error: 'Unauthorized' });
+          }
+          
+          const status = (info.status_name ?? null) as string | null;
+          if (status === 'Deshabilitado' || status === 'Suspendido') {
+            return res.status(403).json({ error: `Cuenta ${status}. Contacte al administrador.` });
+          }
+          
+          if (info.role_name !== 'audit') {
+            return res.status(403).json({ error: 'Audit only' });
+          }
+          
+          (req as any).user = { id: userId, role: info.role_name, status };
+          next();
+        } finally {
+          conn.release();
+        }
+      } catch (e) {
+        console.error('Audit auth check failed', e);
+        return res.status(500).json({ error: 'Audit auth check failed' });
+      }
     },
   };
 };

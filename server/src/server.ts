@@ -1,5 +1,7 @@
 import { App } from './app';
 
+console.log('Starting server');
+
 const app = new App();
 
 async function startServer() {

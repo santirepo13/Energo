@@ -1,6 +1,8 @@
 import { Pool } from 'mysql2/promise';
 import { EnergyCard } from '../models/energyCardModel';
 
+console.log('Loading energy card service');
+
 export class EnergyCardService {
   constructor(private pool: Pool) {}
 
@@ -39,13 +41,21 @@ export class EnergyCardService {
       if (existingCard) {
         if (existingCard.user_id == null) {
           await conn.query('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [existingCard.id, userId, name]);
-          return await this.getCardById(conn, existingCard.id);
+          const card = await this.getCardById(conn, existingCard.id);
+          if (!card) {
+            throw new Error('Failed to claim card');
+          }
+          return card;
         } else {
           throw new Error('Card number already exists');
         }
       } else {
         await conn.query('CALL sp_energy_cards_insert(?, ?, ?)', [userId, cardNumber, name]);
-        return await this.getCardByUserAndNumber(userId, cardNumber);
+        const card = await this.getCardByUserAndNumber(userId, cardNumber);
+        if (!card) {
+          throw new Error('Failed to create card');
+        }
+        return card;
       }
       
       await conn.commit();
@@ -69,7 +79,11 @@ export class EnergyCardService {
         throw new Error('Card not found');
       }
       
-      return await this.getCardByUserAndNumber(userId, cardNumber);
+      const card = await this.getCardByUserAndNumber(userId, cardNumber);
+      if (!card) {
+        throw new Error('Card not found');
+      }
+      return card;
     } finally {
       conn.release();
     }
