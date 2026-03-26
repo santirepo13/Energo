@@ -13,10 +13,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL,
+        target: 'http://localhost:4000',
         changeOrigin: true,
         secure: false,
       },
     },
   },
 })
+ 
