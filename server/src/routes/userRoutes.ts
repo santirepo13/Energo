@@ -8,7 +8,7 @@ console.log('Loading user routes');
 export const createUserRoutes = (userService: UserService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();
 
-  router.get('/me/profile', authMiddleware.requireAuth, async (req, res) => {
+  router.get('/profile', authMiddleware.requireAuth, async (req, res) => {
     try {
       const userId = (req.session as any).userId;
       const { user, profile, personalDataFilled } = await userService.getProfile(userId);
@@ -18,7 +18,7 @@ export const createUserRoutes = (userService: UserService, authMiddleware: Retur
     }
   });
 
-  router.put('/me/profile', authMiddleware.requireAuth, createValidationMiddleware().validate('profileUpdate'), async (req, res) => {
+  router.put('/profile', authMiddleware.requireAuth, createValidationMiddleware().validate('profileUpdate'), async (req, res) => {
     try {
       const userId = (req.session as any).userId;
       await userService.updateProfile(userId, req.body);
@@ -28,7 +28,7 @@ export const createUserRoutes = (userService: UserService, authMiddleware: Retur
     }
   });
 
-  router.post('/me/password-change', authMiddleware.requireAuth, createValidationMiddleware().validate('passwordChange'), async (req, res) => {
+  router.post('/password-change', authMiddleware.requireAuth, createValidationMiddleware().validate('passwordChange'), async (req, res) => {
     try {
       const userId = (req.session as any).userId;
       await userService.changePassword(userId, req.body.current_password, req.body.new_password);
@@ -38,7 +38,7 @@ export const createUserRoutes = (userService: UserService, authMiddleware: Retur
     }
   });
 
-  router.post('/me/status', authMiddleware.requireAuth, createValidationMiddleware().validate('statusUpdate'), async (req, res) => {
+  router.post('/status', authMiddleware.requireAuth, createValidationMiddleware().validate('statusUpdate'), async (req, res) => {
     try {
       const userId = (req.session as any).userId;
       await userService.updateStatus(userId, req.body);
