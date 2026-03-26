@@ -220,6 +220,9 @@ function App() {
     } finally {
       setAuthenticated(false)
       setCurrentUser(null)
+      setShowProfilePrompt(false)
+      setWaitingForProfile(false)
+      setProfileReady(false)
       window.location.href = '/login'
     }
   }
