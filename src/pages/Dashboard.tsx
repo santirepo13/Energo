@@ -206,16 +206,16 @@ export default function Dashboard() {
           ...prev,
           card: updatedCard,
           cards: updatedCards ?? prev.cards,
-          recharge_history: [
-            {
-               pin_code: res.pin_code,
-              amount: body.amount ?? Number((body.kwh ?? 0) * cost),
-              kwh: body.kwh ?? Number((body.amount ?? 0) / cost),
-              created_at: new Date().toISOString(),
-              card_number: targetCardNumber,
-            },
-            ...prev.recharge_history,
-          ],
+           recharge_history: [
+             {
+                pin_code: res.pin_code,
+               amount: body.amount ?? Number((body.kwh ?? 0) * cost),
+               kwh: body.kwh ?? Number((body.amount ?? 0) / cost),
+               created_at: new Date().toISOString(),
+               card_number: targetCardNumber,
+             },
+             ...(prev.recharge_history ?? []),
+           ],
           security_logs: prev.security_logs,
           cost_per_kwh: prev.cost_per_kwh,
         };
