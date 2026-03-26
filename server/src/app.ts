@@ -32,6 +32,26 @@ export class App {
     // Build backend origin URL for CSP
     const backendOrigin = `http://${config.host}:${config.port}`;
 
+    // Apply CORS FIRST before any other middleware
+    this.app.use(cors({
+      origin: (origin, callback) => {
+        const allowedOrigins = Array.isArray(config.clientOrigin) 
+          ? config.clientOrigin 
+          : [config.clientOrigin];
+        
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true,
+      optionsSuccessStatus: 200,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+
+    // Apply Helmet AFTER CORS
     this.app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -48,24 +68,6 @@ export class App {
   },
 }));
 ;
-this.app.use(cors({
-  origin: (origin, callback) => {
-    const allowedOrigins = Array.isArray(config.clientOrigin) 
-      ? config.clientOrigin 
-      : [config.clientOrigin];
-    
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
