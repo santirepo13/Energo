@@ -206,7 +206,7 @@ export type MeProfileResponse = {
 
 // Obtener perfil propio
 export async function meGetProfile() {
-  const res = await api.get('/me/profile');
+  const res = await api.get('/api/me/profile');
   return res.data as MeProfileResponse;
 }
 
