@@ -98,7 +98,8 @@ export default function ProfilePage() {
     setError(null);
     setSuccess(null);
 
-    if (!form.primer_nombre.trim() || !form.primer_apellido.trim() || !form.tipo_identificacion || !form.numero_identificacion.trim()) {
+    if (!form.primer_nombre.trim() || !form.primer_apellido.trim() || 
+        !form.tipo_identificacion || !form.numero_identificacion.trim()) {
       setError('Complete los campos obligatorios');
       return;
     }
@@ -137,8 +138,14 @@ export default function ProfilePage() {
         });
       }
 
-      const becameFilled = Boolean(form.direccion.trim() && form.telefono.trim());
-      if (isFirstFill && becameFilled) {
+      // Check if all required personal data fields are filled
+      const requiredFieldsFilled = form.primer_nombre.trim() && 
+                                   form.primer_apellido.trim() && 
+                                   form.tipo_identificacion && 
+                                   form.numero_identificacion.trim();
+
+      const becameFilled = isFirstFill && requiredFieldsFilled;
+      if (becameFilled) {
         setIsFirstFill(false);
         setOriginalDoc({
           tipo_identificacion: form.tipo_identificacion,
@@ -166,7 +173,6 @@ export default function ProfilePage() {
     }
   }
   
-
 
   if (loading) {
     return (
