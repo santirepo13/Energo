@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { UserService } from '../services/userService';
+import { EnergyCardService } from '../services/energyCardService';
 
 console.log('Loading user routes');
 
@@ -12,7 +13,10 @@ export const createUserRoutes = (userService: UserService, authMiddleware: Retur
     try {
       const userId = (req.session as any).userId;
       const { user, profile, personalDataFilled } = await userService.getProfile(userId);
-      res.json({ user, profile, personal_data_filled: personalDataFilled });
+      const dbPool = (req.app.get('dbPool') as any);
+      const energyCardService = new EnergyCardService(dbPool);
+      const cards = await energyCardService.getCardsByUser(userId);
+      res.json({ user, profile, personal_data_filled: personalDataFilled, cards });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load profile' });
     }

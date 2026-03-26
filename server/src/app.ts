@@ -108,6 +108,8 @@ export class App {
     this.app.use('/api/me', userRoutes);
     this.app.use('/api/me/meters', energyCardRoutes);
     this.app.use('/api/recharge', rechargeRoutes);
+    
+    this.app.set('dbPool', dbPool);
 
     this.app.get('/health', (req, res) => {
       res.json({ status: 'healthy', timestamp: new Date().toISOString() });
