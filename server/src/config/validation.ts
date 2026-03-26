@@ -32,10 +32,10 @@ export const validationSchemas = {
     primer_apellido: Joi.string().required(),
     tipo_identificacion: Joi.string().required(),
     numero_identificacion: Joi.string().required(),
-    segundo_nombre: Joi.string().optional(),
-    segundo_apellido: Joi.string().optional(),
-    direccion: Joi.string().optional(),
-    telefono: Joi.string().optional(),
+    segundo_nombre: Joi.string().optional().allow(null, ''),
+    segundo_apellido: Joi.string().optional().allow(null, ''),
+    direccion: Joi.string().optional().allow(null, ''),
+    telefono: Joi.string().optional().allow(null, ''),
   }),
   
   adminUserUpdate: Joi.object({
