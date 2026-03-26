@@ -23,7 +23,6 @@ export class App {
   constructor() {
     this.app = express();
     this.dbConnection = new DatabaseConnection();
-    this.initializeRoutes();
     this.initializeErrorHandling();
   }
 
@@ -84,6 +83,7 @@ export class App {
 
   async start(): Promise<void> {
     await this.initializeMiddleware();
+    this.initializeRoutes();
     const config = loadAppConfig();
     const port = config.port;
     
