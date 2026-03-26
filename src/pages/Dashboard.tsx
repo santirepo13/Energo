@@ -202,13 +202,13 @@ export default function Dashboard() {
         const updatedCards = prev.cards
           ? prev.cards.map((c) =>
               c.card_number === targetCardNumber
-               ? { ...c, current_balance: newBalance, current_kwh: newKwh }
+                ? { ...c, current_balance: newBalance, current_kwh: newKwh }
                 : c
             )
           : prev.cards;
         const updatedCard =
           prev.card && prev.card.card_number === targetCardNumber
-             ? { ...prev.card, current_balance: newBalance, current_kwh: newKwh }
+            ? { ...prev.card, current_balance: newBalance, current_kwh: newKwh }
             : prev.card;
         const next: DashboardResponse = {
           ...prev,
