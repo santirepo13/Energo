@@ -14,7 +14,7 @@ export interface AppConfig {
 }
 
 export const loadAppConfig = (): AppConfig => {
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173';
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173,http://192.168.2.24:5173';
   const origins = clientOrigin.split(',').map(s => s.trim()).filter(s => s);
   
   const config = {
