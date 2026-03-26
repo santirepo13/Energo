@@ -12,8 +12,7 @@ import { createUserRoutes } from './routes/userRoutes';
 import { createEnergyCardRoutes } from './routes/energyCardRoutes';
 import { createRechargeRoutes } from './routes/rechargeRoutes';
 import { loadAppConfig } from './config/config';
-import { Sequelize } from 'sequelize';
-import connectSessionSequelize from 'connect-session-sequelize';
+import { MySQLSessionStore } from './stores/sessionStore';
 
 console.log('Loading app');
 
@@ -39,32 +38,14 @@ export class App {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    const sequelize = new Sequelize({
-      dialect: 'mysql',
-      host: config.database.host,
-      database: config.database.name,
-      username: config.database.username,
-      password: config.database.password,
-      logging: false
-    });
-
-    await sequelize.authenticate();
-
-    const SequelizeStore = connectSessionSequelize(session.Store);
-    const store = new SequelizeStore({
-      db: sequelize,
-      table: 'sessions',
-      expiration: 86400000, // 24 hours
-      checkExpirationInterval: 900000 // 15 minutes
-    }) as any;
-
-    await (store as any).sync(); // Create sessions table
+    const dbPool = this.dbConnection.getPool();
+    const sessionStore = new MySQLSessionStore(dbPool);
 
     this.app.use(session({
       secret: config.sessionSecret,
       resave: false,
       saveUninitialized: false,
-      store: store,
+      store: sessionStore,
       cookie: {
         secure: false, // false for development over HTTP
         httpOnly: true,
@@ -72,7 +53,8 @@ export class App {
         maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
       }
     }));
-    const rateLimitMiddleware = createRateLimitMiddleware({windowMs: 15 * 60 * 1000, max: 100, message: 'Too many requests from this IP'});
+
+    const rateLimitMiddleware = createRateLimitMiddleware({windowMs: 15*60*1000, max: 100, message: 'Too many requests'});
     this.app.use(rateLimitMiddleware.rateLimit);
   }
 
