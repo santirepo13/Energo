@@ -223,13 +223,13 @@ export type UpdateProfileRequest = {
 };
 
 export async function meUpdateProfile(data: UpdateProfileRequest) {
-  const res = await api.put('/me/profile', data);
+  const res = await api.put('/api/me/profile', data);
   return res.data as { message: string };
 }
 
 // Cambiar contraseña (valida política en backend)
 export async function meChangePassword(current_password: string, new_password: string) {
-  const res = await api.post('/me/password-change', { current_password, new_password });
+  const res = await api.post('/api/me/password-change', { current_password, new_password });
   return res.data as { message: string };
 }
 
@@ -237,7 +237,7 @@ export async function meChangePassword(current_password: string, new_password: s
 export type SelfStatus = 'Pausa' | 'Deshabilitado';
 
 export async function meUpdateStatus(status: SelfStatus) {
-  const res = await api.post('/me/status', { status });
+  const res = await api.post('/api/me/status', { status });
   return res.data as { message: string };
 }
 
@@ -264,13 +264,13 @@ export async function meAddMeter(card_number: string, name?: string) {
 }
 
 export async function meReleaseMeter(card_number: string) {
-  const res = await api.delete(`api/me/meters/${encodeURIComponent(card_number)}`);
+  const res = await api.delete(`/api/me/meters/${encodeURIComponent(card_number)}`);
   return res.data as { message: string };
 }
 
 // Edit meter name
 export async function meRenameMeter(card_number: string, name: string | null) {
-  const res = await api.patch(`/me/meters/${encodeURIComponent(card_number)}`, { name });
+  const res = await api.patch(`/api/me/meters/${encodeURIComponent(card_number)}`, { name });
   return res.data as { meter: UserMeter };
 }
 
@@ -300,12 +300,12 @@ export type AdminUserDetail = {
 };
 
 export async function adminGetUserDetail(id: number) {
-  const res = await api.get(`/me/meters/${id}`);
+  const res = await api.get(`/api/me/meters/${id}`);
   return res.data as { user: AdminUserDetail };
 }
 
 export async function adminGetUserLogs(id: number) {
-  const res = await api.get(`/me/meters/${id}/logs`);
+  const res = await api.get(`/api/me/meters/${id}/logs`);
   return res.data as { logs: Array<{
     event_type: string;
     event_time: string;
@@ -318,7 +318,7 @@ export async function adminLinkMeterToUser(
   id: number,
   card_number: string
 ) {
-  const res = await api.post(`/me/meters/${id}/link`, { card_number });
+  const res = await api.post(`/api/me/meters/${id}/link`, { card_number });
   return res.data as { message: string };
 }
 
@@ -326,17 +326,17 @@ export async function adminRemoveUserMeter(
   id: number,
   card_number: string
 ) {
-  const res = await api.delete(`/me/meters/${id}/${card_number}`);
+  const res = await api.delete(`/api/me/meters/${id}/${card_number}`);
   return res.data as { message: string };
 }
 
 export async function adminSendPasswordReset(id: number) {
-  const res = await api.post(`/me/meters/${id}/send-reset`);
+  const res = await api.post(`/api/me/meters/${id}/send-reset`);
   return res.data as { message: string; link: string };
 }
 
 export async function adminUpdateUserEmail(id: number, email: string) {
-  const res = await api.patch(`/me/meters/${id}/email`, { email });
+  const res = await api.patch(`/api/me/meters/${id}/email`, { email });
   return res.data as { message: string };
 }
 
@@ -344,57 +344,57 @@ export async function adminUpdateUserStatus(
   id: number,
   status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
 ) {
-  const res = await api.patch(`/me/meters/${id}/status`, { status });
+  const res = await api.patch(`/api/me/meters/${id}/status`, { status });
   return res.data as { message: string };
 }
 
 export async function adminSuspendUser(id: number) {
-  const res = await api.post(`/me/meters/${id}/suspend`);
+  const res = await api.post(`/api/me/meters/${id}/suspend`);
   return res.data as { message: string };
 }
 
 export async function adminUnsuspendUser(id: number) {
-  const res = await api.post(`/me/meters/${id}/unsuspend`);
+  const res = await api.post(`/api/me/meters/${id}/unsuspend`);
   return res.data as { message: string };
 }
 
 // ==== Audit Routes ====
 
 export async function auditGetAdmins() {
-  const res = await api.get(`/me/meters`);
+  const res = await api.get(`/api/me/meters`);
   return res.data as { users: AdminUserRow[] };
 }
 
 export async function auditGetEmployees() {
-  const res = await api.get(`/me/meters`);
+  const res = await api.get(`/api/me/meters`);
   return res.data as { users: AdminUserRow[] };
 }
 
 export async function auditGetEmployeeCodes() {
-  const res = await api.get(`/me/meters`);
+  const res = await api.get(`/api/me/meters`);
   return res.data as { codes: EmployeeCodeRow[] };
 }
 
 export async function auditGenerateEmployeeCode(role: 'admin' | 'audit') {
-  const res = await api.post(`/me/meters`, { role });
+  const res = await api.post(`/api/me/meters`, { role });
   return res.data as { id: number; code: string; role: 'admin' | 'audit' };
 }
 
 // ==== Dashboard and Admin Routes ====
 
 export async function auditGetMetrics(days = 30) {
-  const res = await api.get(`/me/meters`, { params: { days } });
+  const res = await api.get(`/api/me/meters`, { params: { days } });
   return res.data as AuditMetrics;
 }
 
 export async function adminUpdateKwhPrice(price: number) {
-  const res = await api.post(`/me/meters`, { price });
+  const res = await api.post(`/api/me/meters`, { price });
   return res.data as { message: string; cost_per_kwh: number };
 }
 
 // ==== Mock Pausa Verification ====
 
 export async function mockPausaVerify(username: string) {
-  const res = await api.post(`/mock/pausa/verify`, { username });
+  const res = await api.post(`/api/mock/pausa/verify`, { username });
   return res.data as { message: string };
 }
