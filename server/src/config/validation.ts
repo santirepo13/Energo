@@ -17,9 +17,11 @@ export const validationSchemas = {
   }),
   
   recharge: Joi.object({
-    amount: Joi.number().min(0).required(),
+    amount: Joi.number().min(0).optional(),
     kwh: Joi.number().min(0).optional(),
     card_number: Joi.string().optional(),
+  }).xor('amount', 'kwh').messages({
+    'object.xor': 'Debe proporcionar ya sea amount o kwh, pero no ambos'
   }),
   
   passwordChange: Joi.object({

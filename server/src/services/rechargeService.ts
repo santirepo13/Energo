@@ -17,13 +17,29 @@ export class RechargeService {
         throw new Error('No energy card for user with that card_number');
       }
       
-      const newBalance = card.current_balance + amount;
-      const newKwh = card.current_kwh + kwh;
+      // Calculate the missing value based on the provided one
+      let calculatedAmount = amount;
+      let calculatedKwh = kwh;
+      
+      if (amount !== undefined && kwh === undefined) {
+        // Amount provided, calculate kWh
+        const kwhPrice = await this.getKwhPrice(conn);
+        calculatedKwh = amount / kwhPrice;
+      } else if (kwh !== undefined && amount === undefined) {
+        // kWh provided, calculate amount
+        const kwhPrice = await this.getKwhPrice(conn);
+        calculatedAmount = kwh * kwhPrice;
+      } else if (amount === undefined && kwh === undefined) {
+        throw new Error('Either amount or kwh must be provided');
+      }
+      
+      const newBalance = card.current_balance + calculatedAmount;
+      const newKwh = card.current_kwh + calculatedKwh;
       
       await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, newKwh]);
       
-      const pin = this.generateSts20Token(card.card_number, amount, kwh);
-      await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, amount, kwh]);
+      const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
+      await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
       
       await conn.commit();
       return { pin, balance: newBalance, kwh: newKwh };
@@ -100,6 +116,16 @@ export class RechargeService {
     const STS_BASE_DATE = new Date(Date.UTC(1993, 0, 1));
     const ms = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - STS_BASE_DATE.getTime();
     return Math.max(0, Math.floor(ms / 86400000));
+  }
+
+  private async getKwhPrice(conn: any): Promise<number> {
+    try {
+      const [rows]: any = await conn.query('SELECT value FROM system_config WHERE key = ?', ['kwh_price']);
+      return Array.isArray(rows) && rows.length ? parseFloat(rows[0].value) : 0;
+    } catch (e) {
+      // Fallback to a default price if the query fails
+      return 0.0005; // Default price per kWh
+    }
   }
 
   private luhnCheckDigit(bodyDigits: string): string {
