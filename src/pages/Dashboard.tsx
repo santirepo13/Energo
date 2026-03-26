@@ -185,6 +185,19 @@ export default function Dashboard() {
       const res = await recharge(body);
       setPin(res.pin_code);
 
+      // Debug logging to see what server returns
+      console.log('Server response:', res);
+      console.log('current_balance:', res.current_balance, typeof res.current_balance);
+      console.log('current_kwh:', res.current_kwh, typeof res.current_kwh);
+
+      // Validate server response contains valid numbers
+      const newBalance = Number(res.current_balance);
+      const newKwh = Number(res.current_kwh);
+      
+      if (!isFinite(newBalance) || !isFinite(newKwh)) {
+        throw new Error('Respuesta del servidor inválida: valores de balance o kWh no son números válidos');
+      }
+
       // Use the selected card number for optimistic update
       const targetCardNumber = selectedCardNumber;
 
@@ -194,13 +207,13 @@ export default function Dashboard() {
         const updatedCards = prev.cards
           ? prev.cards.map((c) =>
               c.card_number === targetCardNumber
-               ? { ...c, current_balance: res.current_balance, current_kwh: res.current_kwh }
+               ? { ...c, current_balance: newBalance, current_kwh: newKwh }
                 : c
             )
           : prev.cards;
         const updatedCard =
           prev.card && prev.card.card_number === targetCardNumber
-             ? { ...prev.card, current_balance: res.current_balance, current_kwh: res.current_kwh }
+             ? { ...prev.card, current_balance: newBalance, current_kwh: newKwh }
             : prev.card;
         const next: DashboardResponse = {
           ...prev,
