@@ -65,7 +65,7 @@ export type DashboardResponse = {
 };
 
 export async function login(data: LoginRequest) {
-  const res = await api.post('/auth/login', data);
+  const res = await api.post('/api/auth/login', data);
   return res.data as { message: string };
 }
 
