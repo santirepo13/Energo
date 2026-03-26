@@ -214,7 +214,7 @@ function App() {
 
   async function handleLogout() {
     try {
-      await api.post('/logout')
+      await api.post('/auth/logout')
     } catch (e) {
       // ignore errors
     } finally {

@@ -202,14 +202,14 @@ export default function ProfilePage() {
               onChange={(e) => set('primer_nombre', e.target.value)}
               required
               fullWidth
-              disabled={!isFirstFill}
+              disabled={isFirstFill === false}
             />
             <TextField
               label="Segundo nombre"
               value={form.segundo_nombre}
               onChange={(e) => set('segundo_nombre', e.target.value)}
               fullWidth
-              disabled={!isFirstFill}
+              disabled={isFirstFill === false}
             />
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -219,14 +219,14 @@ export default function ProfilePage() {
               onChange={(e) => set('primer_apellido', e.target.value)}
               required
               fullWidth
-              disabled={!isFirstFill}
+              disabled={isFirstFill === false}
             />
             <TextField
               label="Segundo apellido"
               value={form.segundo_apellido}
               onChange={(e) => set('segundo_apellido', e.target.value)}
               fullWidth
-              disabled={!isFirstFill}
+              disabled={isFirstFill === false}
             />
           </Stack>
           <Stack spacing={1}>
