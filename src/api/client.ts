@@ -82,9 +82,9 @@ export async function getDashboard() {
 export async function recharge(data: RechargeRequest) {
   const res = await api.post('/recharge', data);
   return res.data as {
-    pin: string;
-    balance: number;
-    kwh: number;
+    pin_code: string;
+    current_balance: number;
+    current_kwh: number;
   };
 }
 
@@ -92,9 +92,9 @@ export async function recharge(data: RechargeRequest) {
 export async function meRecharge(data: RechargeRequest) {
   const res = await api.post('/recharge', data);
   return res.data as {
-    pin: string;
-    balance: number;
-    kwh: number;
+    pin_code: string;
+    current_balance: number;
+    current_kwh: number;
   };
 }
 
