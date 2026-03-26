@@ -12,6 +12,8 @@ import { createUserRoutes } from './routes/userRoutes';
 import { createEnergyCardRoutes } from './routes/energyCardRoutes';
 import { createRechargeRoutes } from './routes/rechargeRoutes';
 import { loadAppConfig } from './config/config';
+import { Sequelize } from 'sequelize';
+import connectSessionSequelize from 'connect-session-sequelize';
 
 console.log('Loading app');
 
@@ -27,7 +29,7 @@ export class App {
     this.initializeErrorHandling();
   }
 
-  private initializeMiddleware(): void {
+  private async initializeMiddleware(): Promise<void> {
     const config = loadAppConfig();
 
     this.app.use(helmet());
@@ -37,10 +39,31 @@ export class App {
     }));
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
+
+    const sequelize = new Sequelize({
+      dialect: 'mysql',
+      host: config.database.host,
+      database: config.database.name,
+      username: config.database.username,
+      password: config.database.password,
+      logging: false
+    });
+
+    const SequelizeStore = connectSessionSequelize(session.Store);
+    const store = new SequelizeStore({
+      db: sequelize,
+      table: 'sessions',
+      expiration: 86400000, // 24 hours
+      checkExpirationInterval: 900000 // 15 minutes
+    }) as any;
+
+    await store.sync(); // Create sessions table
+
     this.app.use(session({
       secret: config.sessionSecret,
       resave: false,
       saveUninitialized: false,
+      store: store,
       cookie: {
         secure: false, // false for development over HTTP
         httpOnly: true,

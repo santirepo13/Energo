@@ -5,6 +5,12 @@ export interface AppConfig {
   sessionSecret: string;
   defaultCostPerKwh: number;
   stsMasterKey: string;
+  database: {
+    host: string;
+    name: string;
+    username: string;
+    password: string;
+  };
 }
 
 export const loadAppConfig = (): AppConfig => {
@@ -18,6 +24,12 @@ export const loadAppConfig = (): AppConfig => {
     sessionSecret: process.env.SESSION_SECRET || 'insecure-dev-secret',
     defaultCostPerKwh: 861.88,
     stsMasterKey: process.env.STS_MASTER_KEY || process.env.SESSION_SECRET || 'insecure-dev-sts-key',
+    database: {
+      host: process.env.DB_HOST || 'localhost',
+      name: process.env.DB_NAME || 'energo',
+      username: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+    },
   };
   
   console.log('Loading app config:', config);
