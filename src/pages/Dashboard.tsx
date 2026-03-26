@@ -185,11 +185,6 @@ export default function Dashboard() {
       const res = await recharge(body);
       setPin(res.pin_code);
 
-      // Debug logging to see what server returns
-      console.log('Server response:', res);
-      console.log('current_balance:', res.current_balance, typeof res.current_balance);
-      console.log('current_kwh:', res.current_kwh, typeof res.current_kwh);
-
       // Validate server response contains valid numbers
       const newBalance = Number(res.current_balance);
       const newKwh = Number(res.current_kwh);
