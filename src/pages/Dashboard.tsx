@@ -163,6 +163,11 @@ export default function Dashboard() {
     setSubmitError(null);
     setPin(null);
     try {
+      // Input validation
+      if (!selectedCardNumber) {
+        throw new Error('Por favor selecciona una tarjeta de energía');
+      }
+
       let body: { amount?: number; kwh?: number; card_number?: string } = {};
       if (mode === 'cop') {
         const v = Number(cop);
@@ -173,14 +178,15 @@ export default function Dashboard() {
         if (!isFinite(v) || v <= 0) throw new Error('Ingrese un valor válido en kWh');
         body.kwh = Number(v.toFixed(2));
       }
-      if (card?.card_number) {
-        body.card_number = card.card_number;
-      }
+      
+      // Use selected card number directly
+      body.card_number = selectedCardNumber;
+      
       const res = await recharge(body);
-      setPin(res.pin);
+      setPin(res.pin_code);
 
       // Use the selected card number for optimistic update
-      const targetCardNumber = card?.card_number ?? selectedCardNumber ?? '';
+      const targetCardNumber = selectedCardNumber;
 
       // Optimistically update local state
       setData((prev) => {
@@ -188,13 +194,13 @@ export default function Dashboard() {
         const updatedCards = prev.cards
           ? prev.cards.map((c) =>
               c.card_number === targetCardNumber
-              ? { ...c, current_balance: res.balance, current_kwh: res.kwh }
+               ? { ...c, current_balance: res.current_balance, current_kwh: res.current_kwh }
                 : c
             )
           : prev.cards;
         const updatedCard =
           prev.card && prev.card.card_number === targetCardNumber
-            ? { ...prev.card, current_balance: res.balance, current_kwh: res.kwh }
+             ? { ...prev.card, current_balance: res.current_balance, current_kwh: res.current_kwh }
             : prev.card;
         const next: DashboardResponse = {
           ...prev,
@@ -202,7 +208,7 @@ export default function Dashboard() {
           cards: updatedCards ?? prev.cards,
           recharge_history: [
             {
-              pin_code: res.pin,
+               pin_code: res.pin_code,
               amount: body.amount ?? Number((body.kwh ?? 0) * cost),
               kwh: body.kwh ?? Number((body.amount ?? 0) / cost),
               created_at: new Date().toISOString(),
