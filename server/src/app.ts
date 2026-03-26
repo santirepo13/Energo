@@ -44,7 +44,7 @@ export class App {
       cookie: {
         secure: false, // false for development over HTTP
         httpOnly: true,
-        sameSite: false, // Allow cross-site cookies in development
+        sameSite: 'lax', // Allow cross-site cookies in development
         maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
       }
     }));
