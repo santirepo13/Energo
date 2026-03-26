@@ -9,7 +9,7 @@ export class MySQLSessionStore extends Store {
       const conn = await this.pool.getConnection();
       const [rows]: any = await conn.query('SELECT sess FROM sessions WHERE sid = ?', [sid]);
       conn.release();
-      callback(null, rows.length ? JSON.parse(rows[0].sess) : null);
+      callback(null, rows.length ? rows[0].sess : null);
     } catch (e) { 
       callback(e); 
     }
