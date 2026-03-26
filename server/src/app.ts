@@ -29,7 +29,22 @@ export class App {
   private async initializeMiddleware(): Promise<void> {
     const config = loadAppConfig();
 
-    this.app.use(helmet());
+    this.app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "http://192.168.2.24:5173"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+      workerSrc: ["'self'", "blob:"],
+    },
+  },
+}));
+;
     this.app.use(cors({
       origin: config.clientOrigin,
       credentials: true
