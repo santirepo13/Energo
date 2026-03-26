@@ -48,10 +48,20 @@ export class App {
   },
 }));
 ;
-    this.app.use(cors({
-      origin: config.clientOrigin,
-      credentials: true
-    }));
+this.app.use(cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = Array.isArray(config.clientOrigin) 
+      ? config.clientOrigin 
+      : [config.clientOrigin];
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
