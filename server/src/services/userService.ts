@@ -136,9 +136,16 @@ export class UserService {
 
   private async updatePersonalDataFlag(conn: any, userId: number, profileData: any): Promise<void> {
     const personalDataFilled = profileData.tipo_identificacion && profileData.numero_identificacion && profileData.primer_nombre && profileData.primer_apellido;
+    const flagValue = personalDataFilled ? 1 : 0;
+    
+    // Validate that flagValue is a number
+    if (typeof flagValue !== 'number') {
+      throw new Error('Invalid value for personal_data_filled flag');
+    }
+    
     await conn.query(
       'INSERT INTO user_flags (user_id, personal_data_filled) VALUES (?, ?) ON DUPLICATE KEY UPDATE personal_data_filled = ?',
-      [userId, personalDataFilled, personalDataFilled]
+      [userId, flagValue, flagValue]
     );
   }
 
