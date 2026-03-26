@@ -319,7 +319,7 @@ function App() {
         </Typography>
       </Box>
 
-      {authenticated === true && ((location.pathname.startsWith('/me') ? waitingForProfile : (showProfilePrompt || waitingForProfile))) && (
+      {authenticated === true && !['/login', '/register', '/reset-password'].includes(location.pathname) && ((location.pathname.startsWith('/me') ? waitingForProfile : (showProfilePrompt || waitingForProfile))) && (
         <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center' }}>
           {showProfilePrompt && !location.pathname.startsWith('/me') && (
             <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
