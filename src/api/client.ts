@@ -167,7 +167,6 @@ export async function auditUpdateStatus(
 
 
 
-
 // ==== Audit Employees (admin + audit) and Employee Codes API ====
 
 export type EmployeeCodeRow = {
@@ -224,7 +223,7 @@ export type UpdateProfileRequest = {
 };
 
 export async function meUpdateProfile(data: UpdateProfileRequest) {
-  const res = await api.put('/api/me/profile', data);
+  const res = await api.put('/me/profile', data);
   return res.data as { message: string };
 }
 
