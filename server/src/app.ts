@@ -48,6 +48,8 @@ export class App {
       logging: false
     });
 
+    await sequelize.authenticate();
+
     const SequelizeStore = connectSessionSequelize(session.Store);
     const store = new SequelizeStore({
       db: sequelize,
@@ -56,7 +58,7 @@ export class App {
       checkExpirationInterval: 900000 // 15 minutes
     }) as any;
 
-    await store.sync(); // Create sessions table
+    await (store as any).sync(); // Create sessions table
 
     this.app.use(session({
       secret: config.sessionSecret,
