@@ -22,8 +22,8 @@ import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import PeopleIcon from '@mui/icons-material/People';
 import { useNavigate } from 'react-router-dom';
 import {
-  auditListEmployees,
-  auditListEmployeeCodes,
+  auditGetEmployees,
+  auditGetEmployeeCodes,
   auditGenerateEmployeeCode,
 } from '../api/client';
 import type { AdminUserRow, EmployeeCodeRow } from '../api/client';
@@ -52,7 +52,7 @@ export default function AuditEmployeesPage() {
     setLoadingEmployees(true);
     setEmpError(null);
     try {
-      const res = await auditListEmployees();
+      const res = await auditGetEmployees();
       setEmployees(res.users);
     } catch (e: any) {
       setEmpError(e?.response?.data?.error || e?.message || 'No se pudieron cargar los empleados');
@@ -65,7 +65,7 @@ export default function AuditEmployeesPage() {
     setLoadingCodes(true);
     setCodesError(null);
     try {
-      const res = await auditListEmployeeCodes();
+      const res = await auditGetEmployeeCodes();
       setCodes(res.codes);
     } catch (e: any) {
       setCodesError(e?.response?.data?.error || e?.message || 'No se pudieron cargar los códigos');

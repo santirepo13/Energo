@@ -177,21 +177,24 @@ export default function Dashboard() {
         body.card_number = card.card_number;
       }
       const res = await recharge(body);
-      setPin(res.pin_code);
+      setPin(res.pin);
+
+      // Use the selected card number for optimistic update
+      const targetCardNumber = card?.card_number ?? selectedCardNumber ?? '';
 
       // Optimistically update local state
       setData((prev) => {
         if (!prev) return prev;
         const updatedCards = prev.cards
           ? prev.cards.map((c) =>
-              c.card_number === res.card_number
-                ? { ...c, current_balance: res.current_balance, current_kwh: res.current_kwh }
+              c.card_number === targetCardNumber
+              ? { ...c, current_balance: res.balance, current_kwh: res.kwh }
                 : c
             )
           : prev.cards;
         const updatedCard =
-          prev.card && prev.card.card_number === res.card_number
-            ? { ...prev.card, current_balance: res.current_balance, current_kwh: res.current_kwh }
+          prev.card && prev.card.card_number === targetCardNumber
+            ? { ...prev.card, current_balance: res.balance, current_kwh: res.kwh }
             : prev.card;
         const next: DashboardResponse = {
           ...prev,
@@ -199,11 +202,11 @@ export default function Dashboard() {
           cards: updatedCards ?? prev.cards,
           recharge_history: [
             {
-              pin_code: res.pin_code,
+              pin_code: res.pin,
               amount: body.amount ?? Number((body.kwh ?? 0) * cost),
               kwh: body.kwh ?? Number((body.amount ?? 0) / cost),
               created_at: new Date().toISOString(),
-              card_number: res.card_number,
+              card_number: targetCardNumber,
             },
             ...prev.recharge_history,
           ],

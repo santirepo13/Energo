@@ -1,15 +1,7 @@
 import { Pool } from 'mysql2/promise';
 import { RechargePin, RechargeTransaction } from '../models/rechargeModel';
 
-export interface RechargeRepository {
-  createPin: (userId: number, cardNumber: string, pinCode: string, amount: number, kwh: number) => Promise<number>;
-  createTransaction: (userId: number, cardNumber: string, amount: number, kwh: number) => Promise<number>;
-  findByUserId: (userId: number) => Promise<RechargeTransaction[]>;
-  findByUserIdAndCardNumber: (userId: number, cardNumber: string) => Promise<RechargeTransaction[]>;
-  getLatestPins: (limit: number) => Promise<RechargePin[]>;
-}
-
-export class RechargeRepository implements RechargeRepository {
+export class RechargeRepository {
   constructor(private pool: Pool) {}
 
   async createPin(userId: number, cardNumber: string, pinCode: string, amount: number, kwh: number): Promise<number> {
