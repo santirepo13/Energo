@@ -65,25 +65,34 @@ export type DashboardResponse = {
 };
 
 export async function login(data: LoginRequest) {
-  const res = await api.post('/login', data);
+  const res = await api.post('/auth/login', data);
   return res.data as { message: string };
 }
 
 export async function registerUser(data: RegisterRequest) {
-  const res = await api.post('/register', data);
+  const res = await api.post('/auth/register', data);
   return res.data as { message: string } | { error: string };
 }
 
 export async function getDashboard() {
-  const res = await api.get('/me/dashboard');
+  const res = await api.get('/me/profile');
   return res.data as DashboardResponse;
 }
 
 export async function recharge(data: RechargeRequest) {
-  const res = await api.post('/me/recharge', data);
+  const res = await api.post('/recharge', data);
   return res.data as {
     pin_code: string;
-    card_number: string;
+    current_balance: number;
+    current_kwh: number;
+  };
+}
+
+
+export async function meRecharge(data: RechargeRequest) {
+  const res = await api.post('/recharge', data);
+  return res.data as {
+    pin_code: string;
     current_balance: number;
     current_kwh: number;
   };
@@ -105,12 +114,12 @@ export type AdminUserRow = {
 };
 
 export async function adminListUsers() {
-  const res = await api.get('/admin/users');
+  const res = await api.get('/me/meters');
   return res.data as { users: AdminUserRow[] };
 }
 
 export async function adminUpdateEmail(id: number, email: string) {
-  const res = await api.patch(`/admin/users/${id}/email`, { email });
+  const res = await api.patch(`/me/meters/${id}/email`, { email });
   return res.data as { message: string };
 }
 
@@ -118,12 +127,12 @@ export async function adminUpdateStatus(
   id: number,
   status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
 ) {
-  const res = await api.patch(`/admin/users/${id}/status`, { status });
+  const res = await api.patch(`/me/meters/${id}/status`, { status });
   return res.data as { message: string };
 }
 
 export async function adminSendReset(id: number) {
-  const res = await api.post(`/admin/users/${id}/send-reset`);
+  const res = await api.post(`/me/meters/${id}/send-reset`);
   return res.data as { message: string; link: string };
 }
 
@@ -144,7 +153,7 @@ export type AuditMetrics = {
 };
 
 export async function auditListAdmins() {
-  const res = await api.get('/audit/admins');
+  const res = await api.get('/me/meters');
   return res.data as { users: AdminUserRow[] };
 }
 
@@ -152,9 +161,10 @@ export async function auditUpdateStatus(
   id: number,
   status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
 ) {
-  const res = await api.patch(`/audit/users/${id}/status`, { status });
+  const res = await api.patch(`/me/meters/${id}/status`, { status });
   return res.data as { message: string };
 }
+
 
 
 
@@ -170,15 +180,7 @@ export type EmployeeCodeRow = {
   used_by_username?: string | null;
 };
 
-export async function auditListEmployees() {
-  const res = await api.get('/audit/employees');
-  return res.data as { users: AdminUserRow[] };
-}
 
-export async function auditListEmployeeCodes() {
-  const res = await api.get('/audit/employee-codes');
-  return res.data as { codes: EmployeeCodeRow[] };
-}
 
 
 // ==== Perfil de usuario (self-service) ====
@@ -195,7 +197,7 @@ export type UserProfile = {
   telefono: string | null;
 };
 
-// Respuesta de GET /api/me/profile
+// Respuesta de GET /me/profile
 export type MeProfileResponse = {
   username: string;
   email: string;           // correo de registro (solo lectura en UI)
@@ -299,12 +301,12 @@ export type AdminUserDetail = {
 };
 
 export async function adminGetUserDetail(id: number) {
-  const res = await api.get(`/admin/users/${id}`);
+  const res = await api.get(`/me/meters/${id}`);
   return res.data as { user: AdminUserDetail };
 }
 
 export async function adminGetUserLogs(id: number) {
-  const res = await api.get(`/admin/users/${id}/logs`);
+  const res = await api.get(`/me/meters/${id}/logs`);
   return res.data as { logs: Array<{
     event_type: string;
     event_time: string;
@@ -317,7 +319,7 @@ export async function adminLinkMeterToUser(
   id: number,
   card_number: string
 ) {
-  const res = await api.post(`/admin/users/${id}/meters/link`, { card_number });
+  const res = await api.post(`/me/meters/${id}/link`, { card_number });
   return res.data as { message: string };
 }
 
@@ -325,17 +327,17 @@ export async function adminRemoveUserMeter(
   id: number,
   card_number: string
 ) {
-  const res = await api.delete(`/admin/users/${id}/meters/${card_number}`);
+  const res = await api.delete(`/me/meters/${id}/${card_number}`);
   return res.data as { message: string };
 }
 
 export async function adminSendPasswordReset(id: number) {
-  const res = await api.post(`/admin/users/${id}/send-reset`);
+  const res = await api.post(`/me/meters/${id}/send-reset`);
   return res.data as { message: string; link: string };
 }
 
 export async function adminUpdateUserEmail(id: number, email: string) {
-  const res = await api.patch(`/admin/users/${id}/email`, { email });
+  const res = await api.patch(`/me/meters/${id}/email`, { email });
   return res.data as { message: string };
 }
 
@@ -343,51 +345,51 @@ export async function adminUpdateUserStatus(
   id: number,
   status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
 ) {
-  const res = await api.patch(`/admin/users/${id}/status`, { status });
+  const res = await api.patch(`/me/meters/${id}/status`, { status });
   return res.data as { message: string };
 }
 
 export async function adminSuspendUser(id: number) {
-  const res = await api.post(`/admin/users/${id}/suspend`);
+  const res = await api.post(`/me/meters/${id}/suspend`);
   return res.data as { message: string };
 }
 
 export async function adminUnsuspendUser(id: number) {
-  const res = await api.post(`/admin/users/${id}/unsuspend`);
+  const res = await api.post(`/me/meters/${id}/unsuspend`);
   return res.data as { message: string };
 }
 
 // ==== Audit Routes ====
 
 export async function auditGetAdmins() {
-  const res = await api.get(`/audit/admins`);
+  const res = await api.get(`/me/meters`);
   return res.data as { users: AdminUserRow[] };
 }
 
 export async function auditGetEmployees() {
-  const res = await api.get(`/audit/employees`);
+  const res = await api.get(`/me/meters`);
   return res.data as { users: AdminUserRow[] };
 }
 
 export async function auditGetEmployeeCodes() {
-  const res = await api.get(`/audit/employee-codes`);
+  const res = await api.get(`/me/meters`);
   return res.data as { codes: EmployeeCodeRow[] };
 }
 
 export async function auditGenerateEmployeeCode(role: 'admin' | 'audit') {
-  const res = await api.post(`/audit/employee-codes`, { role });
+  const res = await api.post(`/me/meters`, { role });
   return res.data as { id: number; code: string; role: 'admin' | 'audit' };
 }
 
 // ==== Dashboard and Admin Routes ====
 
 export async function auditGetMetrics(days = 30) {
-  const res = await api.get(`/audit/metrics`, { params: { days } });
+  const res = await api.get(`/me/meters`, { params: { days } });
   return res.data as AuditMetrics;
 }
 
 export async function adminUpdateKwhPrice(price: number) {
-  const res = await api.post(`/admin/kwh-price`, { price });
+  const res = await api.post(`/me/meters`, { price });
   return res.data as { message: string; cost_per_kwh: number };
 }
 
@@ -397,4 +399,3 @@ export async function mockPausaVerify(username: string) {
   const res = await api.post(`/mock/pausa/verify`, { username });
   return res.data as { message: string };
 }
-
