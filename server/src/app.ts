@@ -28,6 +28,9 @@ export class App {
 
   private async initializeMiddleware(): Promise<void> {
     const config = loadAppConfig();
+    
+    // Build backend origin URL for CSP
+    const backendOrigin = `http://${config.host}:${config.port}`;
 
     this.app.use(helmet({
   contentSecurityPolicy: {
@@ -35,7 +38,7 @@ export class App {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "http://192.168.2.24:5173"],
+      connectSrc: ["'self'", "http://192.168.2.24:5173", backendOrigin],
       imgSrc: ["'self'", "data:", "blob:"],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
