@@ -20,7 +20,13 @@ export const createAuthRoutes = (authService: AuthService, authMiddleware: Retur
     (req.session as any).role = user.role_name;
     (req.session as any).status = user.status_name;
     
-    res.json({ message: 'Login successful' });
+    req.session.save((err) => {
+      if (err) {
+        console.error('Error saving session:', err);
+        return res.status(500).json({ error: 'Session error' });
+      }
+      res.json({ message: 'Login successful' });
+    });
   });
 
   router.post('/register', createValidationMiddleware().validate('register'), async (req, res) => {
