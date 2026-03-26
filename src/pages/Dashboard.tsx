@@ -518,7 +518,7 @@ export default function Dashboard() {
                     <TableCell align="right">{formatCOPCost(cost)}</TableCell>
                   </TableRow>
                 ))}
-                {(!data || data.recharge_history.length === 0) && (
+                {(!data || !data.recharge_history || data.recharge_history.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={isAdmin ? 8 : 6} align="center">
                       Sin recargas todavía.
@@ -602,7 +602,7 @@ export default function Dashboard() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {(!data || data.security_logs.length === 0) && (
+                   {(!data || !data.security_logs || data.security_logs.length === 0) && (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
                         Sin eventos registrados.
