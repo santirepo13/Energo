@@ -12,7 +12,7 @@ export const createUserRoutes = (userService: UserService, authMiddleware: Retur
     try {
       const userId = (req.session as any).userId;
       const { user, profile, personalDataFilled } = await userService.getProfile(userId);
-      res.json({ user, profile, personalDataFilled });
+      res.json({ user, profile, personal_data_filled: personalDataFilled });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load profile' });
     }
