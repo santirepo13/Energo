@@ -70,7 +70,7 @@ export async function login(data: LoginRequest) {
 }
 
 export async function registerUser(data: RegisterRequest) {
-  const res = await api.post('/auth/register', data);
+  const res = await api.post('/api/auth/register', data);
   return res.data as { message: string } | { error: string };
 }
 
@@ -99,7 +99,7 @@ export async function meRecharge(data: RechargeRequest) {
 }
 
 export async function health() {
-  const res = await api.get('/health');
+  const res = await api.get('/api/health');
   return res.data as { status: string };
 }
 
