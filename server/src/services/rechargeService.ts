@@ -36,13 +36,33 @@ export class RechargeService {
       const newBalance = card.current_balance + calculatedAmount;
       const newKwh = card.current_kwh + calculatedKwh;
       
-      await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, newKwh]);
+      const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, newKwh]);
+      const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
+        ? updateResult[0][0].affected_rows 
+        : 0;
+      
+      if (affectedRows !== 1) {
+        throw new Error('Failed to update energy card balance: no rows affected');
+      }
+      
+      // Fetch the actual updated balance from the database
+      const [updatedCardResult]: any = await conn.query(
+        'SELECT current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ?',
+        [userId, cardNumber]
+      );
+      
+      if (!Array.isArray(updatedCardResult) || updatedCardResult.length === 0) {
+        throw new Error('Failed to retrieve updated card balance');
+      }
+      
+      const actualBalance = updatedCardResult[0].current_balance;
+      const actualKwh = updatedCardResult[0].current_kwh;
       
       const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
       await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
       
       await conn.commit();
-      return { pin, balance: newBalance, kwh: newKwh };
+      return { pin, balance: actualBalance, kwh: actualKwh };
     } catch (e) {
       await conn.rollback();
       throw e;
