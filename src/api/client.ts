@@ -75,7 +75,7 @@ export async function registerUser(data: RegisterRequest) {
 }
 
 export async function getDashboard() {
-  const res = await api.get('/me/profile');
+  const res = await api.get('/api/me/profile');
   return res.data as DashboardResponse;
 }
 
@@ -114,12 +114,12 @@ export type AdminUserRow = {
 };
 
 export async function adminListUsers() {
-  const res = await api.get('/me/meters');
+  const res = await api.get('/api/me/meters');
   return res.data as { users: AdminUserRow[] };
 }
 
 export async function adminUpdateEmail(id: number, email: string) {
-  const res = await api.patch(`/me/meters/${id}/email`, { email });
+  const res = await api.patch(`/api/me/meters/${id}/email`, { email });
   return res.data as { message: string };
 }
 
@@ -127,12 +127,12 @@ export async function adminUpdateStatus(
   id: number,
   status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
 ) {
-  const res = await api.patch(`/me/meters/${id}/status`, { status });
+  const res = await api.patch(`/api/me/meters/${id}/status`, { status });
   return res.data as { message: string };
 }
 
 export async function adminSendReset(id: number) {
-  const res = await api.post(`/me/meters/${id}/send-reset`);
+  const res = await api.post(`/api/me/meters/${id}/send-reset`);
   return res.data as { message: string; link: string };
 }
 
@@ -153,7 +153,7 @@ export type AuditMetrics = {
 };
 
 export async function auditListAdmins() {
-  const res = await api.get('/me/meters');
+  const res = await api.get('/api/me/meters');
   return res.data as { users: AdminUserRow[] };
 }
 
@@ -161,7 +161,7 @@ export async function auditUpdateStatus(
   id: number,
   status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
 ) {
-  const res = await api.patch(`/me/meters/${id}/status`, { status });
+  const res = await api.patch(`/api/me/meters/${id}/status`, { status });
   return res.data as { message: string };
 }
 
@@ -252,19 +252,19 @@ export type UserMeter = {
 };
 
 export async function meListMeters() {
-  const res = await api.get('/me/meters');
+  const res = await api.get('/api/me/meters');
   return res.data as { meters: UserMeter[] };
 }
 
 export async function meAddMeter(card_number: string, name?: string) {
   const body: any = { card_number };
   if (name && name.trim()) body.name = name.trim();
-  const res = await api.post('/me/meters', body);
+  const res = await api.post('/api/me/meters', body);
   return res.data as { meter: UserMeter };
 }
 
 export async function meReleaseMeter(card_number: string) {
-  const res = await api.delete(`/me/meters/${encodeURIComponent(card_number)}`);
+  const res = await api.delete(`api/me/meters/${encodeURIComponent(card_number)}`);
   return res.data as { message: string };
 }
 
