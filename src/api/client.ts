@@ -224,7 +224,7 @@ export type UpdateProfileRequest = {
 };
 
 export async function meUpdateProfile(data: UpdateProfileRequest) {
-  const res = await api.put('/me/profile', data);
+  const res = await api.put('/api/me/profile', data);
   return res.data as { message: string };
 }
 
