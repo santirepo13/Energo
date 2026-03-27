@@ -17,12 +17,23 @@ export const validationSchemas = {
   }),
   
   recharge: Joi.object({
-  amount: Joi.number().min(0).optional(),
-  kwh: Joi.number().min(0).optional(),
+  amount: Joi.number().min(0).optional().custom((value, helpers) => {
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  }),
+  kwh: Joi.number().min(0).optional().custom((value, helpers) => {
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  }),
   card_number: Joi.string().optional(),
   pin_code: Joi.string().optional(),
 }).xor('amount', 'kwh', 'pin_code').messages({
-  'object.xor': 'Debe proporcionar ya sea amount, kwh o pin_code, pero solo uno'
+  'object.xor': 'Debe proporcionar ya sea amount, kwh o pin_code, pero solo uno',
+  'any.invalid': 'Value must be a valid number'
 }),
   
   passwordChange: Joi.object({

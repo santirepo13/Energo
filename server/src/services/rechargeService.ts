@@ -32,10 +32,9 @@ export class RechargeService {
       const pinData = pinResult[0];
       const calculatedAmount = pinData.amount;
       const calculatedKwh = pinData.kwh;
-      
-      // Validate calculated values are valid numbers
-      if (isNaN(calculatedAmount) || isNaN(calculatedKwh)) {
-        throw new Error('Invalid pin data: amount and kwh must be valid numbers');
+
+      if (!Number.isFinite(calculatedAmount) || !Number.isFinite(calculatedKwh)) {
+        throw new Error('Invalid pin data: amount and kwh must be finite numbers');
       }
       
       const newBalance = card.current_balance + calculatedAmount;
@@ -77,14 +76,14 @@ export class RechargeService {
     if (amount !== undefined && kwh === undefined) {
       // Amount provided, calculate kWh
       const kwhPrice = await this.getKwhPrice(conn);
-      if (isNaN(kwhPrice) || kwhPrice <= 0) {
+      if (!Number.isFinite(kwhPrice) || kwhPrice <= 0) {
         throw new Error('Invalid KWh price: must be a valid positive number');
       }
       calculatedKwh = Math.round((amount / kwhPrice) * 100) / 100;
     } else if (kwh !== undefined && amount === undefined) {
       // kWh provided, calculate amount
       const kwhPrice = await this.getKwhPrice(conn);
-      if (isNaN(kwhPrice) || kwhPrice <= 0) {
+      if (!Number.isFinite(kwhPrice) || kwhPrice <= 0) {
         throw new Error('Invalid KWh price: must be a valid positive number');
       }
       calculatedAmount = Math.round((kwh * kwhPrice) * 100) / 100;
@@ -93,8 +92,8 @@ export class RechargeService {
     }
     
     // Validate calculated values are valid numbers immediately after calculation
-    if (isNaN(calculatedAmount) || isNaN(calculatedKwh)) {
-      throw new Error('Invalid calculated values: amount and kwh must be valid numbers');
+    if (!Number.isFinite(calculatedAmount) || !Number.isFinite(calculatedKwh)) {
+      throw new Error('Invalid calculated values: amount and kwh must be finite numbers');
     }
     
     // Validate calculated kWh does not exceed database limits
@@ -128,8 +127,13 @@ export class RechargeService {
     
     const actualBalance = updatedCardResult[0].current_balance;
     const actualKwh = updatedCardResult[0].current_kwh;
-    
+
     const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
+
+    if (!Number.isFinite(calculatedAmount) || !Number.isFinite(calculatedKwh)) {
+      throw new Error('Invalid calculated values: amount and kwh must be finite numbers');
+    }
+
     await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
     
     await conn.commit();
@@ -215,7 +219,7 @@ export class RechargeService {
       throw new Error('KWh price not found in settings');
     }
     const parsedValue = parseFloat(rows[0].value);
-    if (isNaN(parsedValue) || parsedValue <= 0) {
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
       throw new Error('Invalid KWh price: must be a positive number');
     }
     return parsedValue;
