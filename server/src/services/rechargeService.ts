@@ -119,6 +119,14 @@ export class RechargeService {
     const actualBalance = updatedCardResult[0].current_balance;
     const actualKwh = updatedCardResult[0].current_kwh;
     
+    // Ensure calculatedAmount and calculatedKwh are not undefined or NaN before database query
+    if (calculatedAmount === undefined || isNaN(calculatedAmount)) {
+      throw new Error('Invalid amount: must be a valid number');
+    }
+    if (calculatedKwh === undefined || isNaN(calculatedKwh)) {
+      throw new Error('Invalid kwh: must be a valid number');
+    }
+    
     const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
     await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
     
