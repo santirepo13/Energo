@@ -96,6 +96,11 @@ export class RechargeService {
       throw new Error('Invalid calculated values: amount and kwh must be finite numbers');
     }
     
+    // Guard against NaN values that could be generated during calculations
+    if (isNaN(calculatedAmount) || isNaN(calculatedKwh)) {
+      throw new Error('Invalid calculated values: amount and kwh must be valid numbers');
+    }
+    
     // Validate calculated kWh does not exceed database limits
     if (calculatedKwh > 99999999.99) {
       throw new Error('Calculated kWh exceeds maximum allowed value');
@@ -129,10 +134,6 @@ export class RechargeService {
     const actualKwh = updatedCardResult[0].current_kwh;
 
     const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
-
-    if (!Number.isFinite(calculatedAmount) || !Number.isFinite(calculatedKwh)) {
-      throw new Error('Invalid calculated values: amount and kwh must be finite numbers');
-    }
 
     await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
     
