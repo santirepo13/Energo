@@ -764,34 +764,41 @@ Cookie: [Session cookies from login]
 
 **Endpoint**: `POST {{base_url}}/api/recharge`
 
-**Request Body** (Option 1 - Amount):
+**Important**: The recharge endpoint uses XOR validation - you must provide exactly ONE of: `amount`, `kwh`, or `pin_code`.
+
+**Option 1 - Recharge by Amount**:
+
+**Copy-Paste Example**:
 ```json
 {
   "amount": 50000,
-  "card_number": "{{test_card_number}}"
+  "card_number": "1234567890123456"
 }
 ```
 
-**Request Body** (Option 2 - kWh):
+**Option 2 - Recharge by kWh**:
+
+**Copy-Paste Example**:
 ```json
 {
   "kwh": 100,
-  "card_number": "{{test_card_number}}"
+  "card_number": "1234567890123456"
 }
 ```
 
-**Request Body** (Option 3 - PIN Code):
+**Option 3 - Recharge by PIN Code**:
+
+**Copy-Paste Example**:
 ```json
 {
   "pin_code": "STS123456789",
-  "card_number": "{{test_card_number}}"
+  "card_number": "1234567890123456"
 }
 ```
 
 **Headers**:
 ```
-Content-Type: {{content_type}}
-Cookie: [Session cookies from login]
+Content-Type: application/json
 ```
 
 **Expected Response** (200 OK):
@@ -803,8 +810,6 @@ Cookie: [Session cookies from login]
 }
 ```
 
-**Important**: The recharge endpoint uses XOR validation - you must provide exactly ONE of: `amount`, `kwh`, or `pin_code`.
-
 **Test Cases**:
 - ✅ Create recharge with amount
 - ✅ Create recharge with kWh
@@ -812,6 +817,41 @@ Cookie: [Session cookies from login]
 - ❌ Create recharge with multiple parameters (should return validation error)
 - ❌ Create recharge with no parameters
 - ❌ Create recharge when not authenticated
+
+**Error Response Examples**:
+
+*Multiple Parameters*:
+```json
+{
+  "error": "Debe proporcionar ya sea amount, kwh o pin_code, pero solo uno"
+}
+```
+
+*No Parameters*:
+```json
+{
+  "error": "Debe proporcionar ya sea amount, kwh o pin_code, pero solo uno"
+}
+```
+
+*Invalid Card Number*:
+```json
+{
+  "error": "Card not found or not linked to user"
+}
+```
+
+*Insufficient Balance for PIN Redemption*:
+```json
+{
+  "error": "Insufficient balance in PIN code"
+}
+```
+
+**Response Field Explanations**:
+- `pin_code`: The generated STS-20 token for the recharge
+- `current_balance`: Updated balance in cents after the recharge
+- `current_kwh`: Updated energy units after the recharge
 
 #### 2. Get Recharge History
 
@@ -994,6 +1034,379 @@ Create mock servers for frontend development:
 7. **Version Control**: Keep collections in version control with your code
 8. **Regular Updates**: Update collections when API changes
 
+## Postman Collection JSON
+
+For immediate setup, you can import this complete Postman collection JSON. Copy the entire JSON below and import it into Postman.
+
+### Complete Collection JSON
+
+```json
+{
+  "info": {
+    "name": "Energo API Collection",
+    "description": "Complete API collection for testing Energo backend endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "User Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser123\",\n  \"password\": \"SecurePassword123!\",\n  \"email\": \"testuser@example.com\",\n  \"card_number\": \"1234567890123456\",\n  \"employee_code\": \"EMP001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser123\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "User Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/me/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primer_nombre\": \"Juan\",\n  \"primer_apellido\": \"Pérez\",\n  \"tipo_identificacion\": \"CC\",\n  \"numero_identificacion\": \"12345678\",\n  \"segundo_nombre\": \"Carlos\",\n  \"segundo_apellido\": \"Gómez\",\n  \"direccion\": \"Calle 123 #45-67\",\n  \"telefono\": \"3001234567\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/me/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"SecurePassword123!\",\n  \"new_password\": \"NewSecurePassword456!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/me/password-change",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "password-change"]
+            }
+          }
+        },
+        {
+          "name": "Update Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "\"Pausa\""
+            },
+            "url": {
+              "raw": "{{base_url}}/api/me/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Energy Cards",
+      "item": [
+        {
+          "name": "List Meters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/me/meters",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "meters"]
+            }
+          }
+        },
+        {
+          "name": "Add Meter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"9876543210987654\",\n  \"name\": \"Oficina Principal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/me/meters",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "meters"]
+            }
+          }
+        },
+        {
+          "name": "Release Meter",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/me/meters/1234567890123456",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "meters", "1234567890123456"]
+            }
+          }
+        },
+        {
+          "name": "Update Meter Name",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Casa Principal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/me/meters/1234567890123456",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me", "meters", "1234567890123456"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recharges",
+      "item": [
+        {
+          "name": "Create Recharge - Amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000,\n  \"card_number\": \"1234567890123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/recharge",
+              "host": ["{{base_url}}"],
+              "path": ["api", "recharge"]
+            }
+          }
+        },
+        {
+          "name": "Create Recharge - kWh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kwh\": 100,\n  \"card_number\": \"1234567890123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/recharge",
+              "host": ["{{base_url}}"],
+              "path": ["api", "recharge"]
+            }
+          }
+        },
+        {
+          "name": "Create Recharge - PIN Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin_code\": \"STS123456789\",\n  \"card_number\": \"1234567890123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/recharge",
+              "host": ["{{base_url}}"],
+              "path": ["api", "recharge"]
+            }
+          }
+        },
+        {
+          "name": "Get Recharge History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/recharge/history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "recharge", "history"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "test_username",
+      "value": "testuser123",
+      "type": "string"
+    },
+    {
+      "key": "test_password",
+      "value": "SecurePassword123!",
+      "type": "string"
+    },
+    {
+      "key": "test_email",
+      "value": "testuser@example.com",
+      "type": "string"
+    },
+    {
+      "key": "test_card_number",
+      "value": "1234567890123456",
+      "type": "string"
+    },
+    {
+      "key": "test_employee_code",
+      "value": "EMP001",
+      "type": "string"
+    }
+  ]
+}
+```
+
+**How to Import**:
+1. Copy the entire JSON above
+2. In Postman, click **Import**
+3. Select **Paste Raw Text**
+4. Paste the JSON and click **Import**
+5. The collection will be ready to use with all endpoints pre-configured
+
 ## Conclusion
 
 This tutorial provides a comprehensive guide for testing the Energo API using Postman. By following these instructions, you can:
@@ -1003,5 +1416,10 @@ This tutorial provides a comprehensive guide for testing the Energo API using Po
 - Validate authentication flows
 - Monitor API performance
 - Troubleshoot common issues
+
+**Quick Start**:
+1. Copy the Postman Collection JSON above
+2. Import it into Postman
+3. Start testing immediately with pre-configured examples
 
 Remember to update your Postman collection whenever the API changes and to include new endpoints in your testing workflow.

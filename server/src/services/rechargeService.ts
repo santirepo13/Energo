@@ -21,12 +21,12 @@ export class RechargeService {
     if (pinCode) {
       // For pin code recharges, use the provided balance and kwh values
       const [pinResult]: any = await conn.query(
-        'SELECT amount, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ? AND used = 0',
+        'SELECT amount, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ?',
         [pinCode, userId]
       );
       
       if (!Array.isArray(pinResult) || pinResult.length === 0) {
-        throw new Error('Invalid or already used pin code');
+        throw new Error('Invalid pin code');
       }
       
       const pinData = pinResult[0];
@@ -44,9 +44,6 @@ export class RechargeService {
       if (affectedRows !== 1) {
         throw new Error('Failed to update energy card balance: no rows affected');
       }
-      
-      // Mark the pin as used
-      await conn.query('UPDATE recharge_pins SET used = 1, used_at = NOW() WHERE pin_code = ?', [pinCode]);
       
       // Fetch the actual updated balance from the database
       const [updatedCardResult]: any = await conn.query(
