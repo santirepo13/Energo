@@ -33,7 +33,6 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
-import RedeemIcon from '@mui/icons-material/Redeem';
 import type { DashboardResponse, AuditMetrics } from '../api/client';
 import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
 

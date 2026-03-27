@@ -1034,9 +1034,9 @@ Create mock servers for frontend development:
 7. **Version Control**: Keep collections in version control with your code
 8. **Regular Updates**: Update collections when API changes
 
-## Postman Collection JSON
+## Complete Postman Collection with Ready-to-Use Links
 
-For immediate setup, you can import this complete Postman collection JSON. Copy the entire JSON below and import it into Postman.
+For immediate testing, you can import this complete Postman collection JSON. Copy the entire JSON below and import it into Postman.
 
 ### Complete Collection JSON
 
@@ -1067,8 +1067,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"username\": \"testuser123\",\n  \"password\": \"SecurePassword123!\",\n  \"email\": \"testuser@example.com\",\n  \"card_number\": \"1234567890123456\",\n  \"employee_code\": \"EMP001\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/auth/register",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/auth/register",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "auth", "register"]
             }
           }
@@ -1088,8 +1089,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"username\": \"testuser123\",\n  \"password\": \"SecurePassword123!\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/auth/login",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/auth/login",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "auth", "login"]
             }
           }
@@ -1105,8 +1107,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/auth/logout",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/auth/logout",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "auth", "logout"]
             }
           }
@@ -1127,8 +1130,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/me/profile",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/profile",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "profile"]
             }
           }
@@ -1148,8 +1152,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"primer_nombre\": \"Juan\",\n  \"primer_apellido\": \"Pérez\",\n  \"tipo_identificacion\": \"CC\",\n  \"numero_identificacion\": \"12345678\",\n  \"segundo_nombre\": \"Carlos\",\n  \"segundo_apellido\": \"Gómez\",\n  \"direccion\": \"Calle 123 #45-67\",\n  \"telefono\": \"3001234567\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/me/profile",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/profile",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "profile"]
             }
           }
@@ -1169,8 +1174,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"current_password\": \"SecurePassword123!\",\n  \"new_password\": \"NewSecurePassword456!\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/me/password-change",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/password-change",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "password-change"]
             }
           }
@@ -1190,8 +1196,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "\"Pausa\""
             },
             "url": {
-              "raw": "{{base_url}}/api/me/status",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/status",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "status"]
             }
           }
@@ -1212,8 +1219,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/me/meters",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/meters",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "meters"]
             }
           }
@@ -1233,8 +1241,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"card_number\": \"9876543210987654\",\n  \"name\": \"Oficina Principal\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/me/meters",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/meters",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "meters"]
             }
           }
@@ -1250,8 +1259,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/me/meters/1234567890123456",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/meters/1234567890123456",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "meters", "1234567890123456"]
             }
           }
@@ -1271,8 +1281,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"name\": \"Casa Principal\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/me/meters/1234567890123456",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/me/meters/1234567890123456",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "me", "meters", "1234567890123456"]
             }
           }
@@ -1297,8 +1308,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"amount\": 50000,\n  \"card_number\": \"1234567890123456\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/recharge",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/recharge",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "recharge"]
             }
           }
@@ -1318,8 +1330,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"kwh\": 100,\n  \"card_number\": \"1234567890123456\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/recharge",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/recharge",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "recharge"]
             }
           }
@@ -1339,8 +1352,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               "raw": "{\n  \"pin_code\": \"STS123456789\",\n  \"card_number\": \"1234567890123456\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/recharge",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/recharge",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "recharge"]
             }
           }
@@ -1356,8 +1370,9 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/recharge/history",
-              "host": ["{{base_url}}"],
+              "raw": "http://localhost:4000/api/recharge/history",
+              "host": ["localhost"],
+              "port": "4000",
               "path": ["api", "recharge", "history"]
             }
           }
@@ -1406,6 +1421,202 @@ For immediate setup, you can import this complete Postman collection JSON. Copy 
 3. Select **Paste Raw Text**
 4. Paste the JSON and click **Import**
 5. The collection will be ready to use with all endpoints pre-configured
+
+## Quick Start Examples - Ready to Copy and Paste
+
+### 1. User Registration
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/auth/register`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "username": "testuser123",
+  "password": "SecurePassword123!",
+  "email": "testuser@example.com",
+  "card_number": "1234567890123456",
+  "employee_code": "EMP001"
+}
+```
+
+### 2. User Login
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/auth/login`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "username": "testuser123",
+  "password": "SecurePassword123!"
+}
+```
+
+### 3. Get Profile
+
+**Method**: GET
+**URL**: `http://localhost:4000/api/me/profile`
+**Headers**:
+```
+Content-Type: application/json
+```
+
+### 4. Create Recharge (Amount)
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/recharge`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "amount": 50000,
+  "card_number": "1234567890123456"
+}
+```
+
+### 5. Create Recharge (kWh)
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/recharge`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "kwh": 100,
+  "card_number": "1234567890123456"
+}
+```
+
+### 6. Add Meter
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/me/meters`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "card_number": "9876543210987654",
+  "name": "Oficina Principal"
+}
+```
+
+### 7. Update Profile
+
+**Method**: PUT
+**URL**: `http://localhost:4000/api/me/profile`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "primer_nombre": "Juan",
+  "primer_apellido": "Pérez",
+  "tipo_identificacion": "CC",
+  "numero_identificacion": "12345678",
+  "segundo_nombre": "Carlos",
+  "segundo_apellido": "Gómez",
+  "direccion": "Calle 123 #45-67",
+  "telefono": "3001234567"
+}
+```
+
+### 8. Change Password
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/me/password-change`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "current_password": "SecurePassword123!",
+  "new_password": "NewSecurePassword456!"
+}
+```
+
+### 9. List Meters
+
+**Method**: GET
+**URL**: `http://localhost:4000/api/me/meters`
+**Headers**:
+```
+Content-Type: application/json
+```
+
+### 10. Get Recharge History
+
+**Method**: GET
+**URL**: `http://localhost:4000/api/recharge/history`
+**Headers**:
+```
+Content-Type: application/json
+```
+
+### 11. Release Meter
+
+**Method**: DELETE
+**URL**: `http://localhost:4000/api/me/meters/1234567890123456`
+**Headers**:
+```
+Content-Type: application/json
+```
+
+### 12. Update Meter Name
+
+**Method**: PATCH
+**URL**: `http://localhost:4000/api/me/meters/1234567890123456`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```json
+{
+  "name": "Casa Principal"
+}
+```
+
+### 13. Update Status
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/me/status`
+**Headers**:
+```
+Content-Type: application/json
+```
+**Body** (raw JSON):
+```
+"Pausa"
+```
+
+### 14. User Logout
+
+**Method**: POST
+**URL**: `http://localhost:4000/api/auth/logout`
+**Headers**:
+```
+Content-Type: application/json
+```
 
 ## Conclusion
 

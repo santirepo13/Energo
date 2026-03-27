@@ -79,6 +79,11 @@ export class RechargeService {
       throw new Error('Either amount or kwh must be provided');
     }
     
+    // Validate calculated kWh does not exceed database limits
+    if (calculatedKwh > 99999999.99) {
+      throw new Error('Calculated kWh exceeds maximum allowed value');
+    }
+    
     const newBalance = card.current_balance + calculatedAmount;
     const newKwh = card.current_kwh + calculatedKwh;
     
@@ -185,13 +190,11 @@ export class RechargeService {
   }
 
   private async getKwhPrice(conn: any): Promise<number> {
-    try {
-      const [rows]: any = await conn.query('SELECT value FROM settings WHERE key = ?', ['cost_per_kwh']);
-      return Array.isArray(rows) && rows.length ? parseFloat(rows[0].value) : 0;
-    } catch (e) {
-      // Fallback to a default price if the query fails
-      return 0.0005; // Default price per kWh
+    const [rows]: any = await conn.query('SELECT value FROM settings WHERE key = ?', ['cost_per_kwh']);
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new Error('KWh price not found in settings');
     }
+    return parseFloat(rows[0].value);
   }
 
   private luhnCheckDigit(bodyDigits: string): string {
