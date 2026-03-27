@@ -11,6 +11,7 @@ import { createAuthRoutes } from './routes/authRoutes';
 import { createUserRoutes } from './routes/userRoutes';
 import { createEnergyCardRoutes } from './routes/energyCardRoutes';
 import { createRechargeRoutes } from './routes/rechargeRoutes';
+import { createAdminRoutes } from './routes/adminRoutes';
 import { loadAppConfig } from './config/config';
 import { MySQLSessionStore } from './stores/sessionStore';
 
@@ -103,11 +104,13 @@ export class App {
     const userRoutes = createUserRoutes(new UserService(dbPool), authMiddleware);
     const energyCardRoutes = createEnergyCardRoutes(new EnergyCardService(dbPool), authMiddleware);
     const rechargeRoutes = createRechargeRoutes(new RechargeService(dbPool), authMiddleware);
+    const adminRoutes = createAdminRoutes(new UserService(dbPool), new EnergyCardService(dbPool), authMiddleware);
 
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/me', userRoutes);
     this.app.use('/api/me/meters', energyCardRoutes);
     this.app.use('/api/recharge', rechargeRoutes);
+    this.app.use('/api/admin', adminRoutes);
     
     this.app.set('dbPool', dbPool);
 
@@ -128,21 +131,22 @@ export class App {
     
     this.app.listen(port, '0.0.0.0', () => {
       console.log(`Server running on port ${port}`);
-      console.log('Available routes:');
-      console.log('  GET /health');
-      console.log('  POST /api/auth/login');
-      console.log('  POST /api/auth/register');
-      console.log('  POST /api/auth/logout');
-      console.log('  GET /api/me/profile');
-      console.log('  PUT /api/me/profile');
-      console.log('  POST /api/me/password-change');
-      console.log('  POST /api/me/status');
-      console.log('  GET /api/me/meters');
-      console.log('  POST /api/me/meters');
-      console.log('  DELETE /api/me/meters/:card_number');
-      console.log('  PATCH /api/me/meters/:card_number');
-      console.log('  POST /api/recharge');
-      console.log('  GET /api/recharge/history');
+    console.log('Available routes:');
+    console.log('  GET /health');
+    console.log('  POST /api/auth/login');
+    console.log('  POST /api/auth/register');
+    console.log('  POST /api/auth/logout');
+    console.log('  GET /api/me/profile');
+    console.log('  PUT /api/me/profile');
+    console.log('  POST /api/me/password-change');
+    console.log('  POST /api/me/status');
+    console.log('  GET /api/me/meters');
+    console.log('  POST /api/me/meters');
+    console.log('  DELETE /api/me/meters/:card_number');
+    console.log('  PATCH /api/me/meters/:card_number');
+    console.log('  POST /api/recharge');
+    console.log('  GET /api/recharge/history');
+    console.log('  POST /api/admin/kwh-price');
     });
   }
 

@@ -188,4 +188,25 @@ export class UserService {
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
 
+  async updateKwhPrice(adminUserId: number, price: number): Promise<{ cost_per_kwh: number }> {
+    const conn = await this.pool.getConnection();
+    try {
+      // Call the stored procedure
+      const [result]: any = await conn.query('CALL sp_set_kwh_price(?, ?)', [adminUserId, price]);
+      
+      // Get the updated price from settings
+      const [priceRows]: any = await conn.query(
+        'SELECT CAST(value AS DECIMAL(10,2)) as cost_per_kwh FROM settings WHERE `key` = ? LIMIT 1',
+        ['cost_per_kwh']
+      );
+      
+      if (!Array.isArray(priceRows) || priceRows.length === 0) {
+        throw new Error('Failed to retrieve updated kWh price');
+      }
+      
+      return { cost_per_kwh: priceRows[0].cost_per_kwh };
+    } finally {
+      conn.release();
+    }
+  }
 } 
