@@ -140,7 +140,7 @@ export class RechargeService {
 
   private async getKwhPrice(conn: any): Promise<number> {
     try {
-      const [rows]: any = await conn.query('SELECT value FROM system_config WHERE key = ?', ['kwh_price']);
+      const [rows]: any = await conn.query('SELECT value FROM settings WHERE key = ?', ['cost_per_kwh']);
       return Array.isArray(rows) && rows.length ? parseFloat(rows[0].value) : 0;
     } catch (e) {
       // Fallback to a default price if the query fails
