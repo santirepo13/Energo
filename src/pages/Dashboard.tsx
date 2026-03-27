@@ -33,6 +33,7 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
+import RedeemIcon from '@mui/icons-material/Redeem';
 import type { DashboardResponse, AuditMetrics } from '../api/client';
 import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
 
@@ -60,9 +61,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardResponse | null>(null);
 
-  const [mode, setMode] = useState<'cop' | 'kwh'>('cop');
+  const [mode, setMode] = useState<'cop' | 'kwh' | 'pin'>('cop');
   const [cop, setCop] = useState<string>(''); // pesos
   const [kwh, setKwh] = useState<string>(''); // kWh
+  const [pinCode, setPinCode] = useState<string>(''); // PIN code
   const [submitting, setSubmitting] = useState(false);
   const [pin, setPin] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -168,15 +170,19 @@ export default function Dashboard() {
         throw new Error('Por favor selecciona una tarjeta de energía');
       }
 
-      let body: { amount?: number; kwh?: number; card_number?: string } = {};
+      let body: { amount?: number; kwh?: number; card_number?: string; pin_code?: string } = {};
+      
       if (mode === 'cop') {
         const v = Number(cop);
         if (!isFinite(v) || v <= 0) throw new Error('Ingrese un valor válido en pesos (COP)');
         body.amount = Math.round(v);
-      } else {
+      } else if (mode === 'kwh') {
         const v = Number(kwh);
         if (!isFinite(v) || v <= 0) throw new Error('Ingrese un valor válido en kWh');
         body.kwh = Number(v.toFixed(2));
+      } else if (mode === 'pin') {
+        if (!pinCode.trim()) throw new Error('Ingrese un código PIN válido');
+        body.pin_code = pinCode.trim();
       }
       
       // Use selected card number directly
@@ -233,6 +239,7 @@ export default function Dashboard() {
       // Clear inputs
       setCop('');
       setKwh('');
+      setPinCode('');
     } catch (e: any) {
       setSubmitError(e?.response?.data?.error || e?.message || 'Recarga fallida');
     } finally {
