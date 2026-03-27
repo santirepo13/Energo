@@ -21,7 +21,7 @@ export class RechargeService {
     if (pinCode) {
       // For pin code recharges, use the provided balance and kwh values
       const [pinResult]: any = await conn.query(
-        'SELECT amount_cop, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ? AND used = 0',
+        'SELECT amount, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ? AND used = 0',
         [pinCode, userId]
       );
       
@@ -30,7 +30,7 @@ export class RechargeService {
       }
       
       const pinData = pinResult[0];
-      const calculatedAmount = pinData.amount_cop;
+      const calculatedAmount = pinData.amount;
       const calculatedKwh = pinData.kwh;
       
       const newBalance = card.current_balance + calculatedAmount;
