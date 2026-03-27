@@ -36,7 +36,9 @@ export class RechargeService {
       const newBalance = card.current_balance + calculatedAmount;
       const newKwh = card.current_kwh + calculatedKwh;
       
-      const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, newKwh]);
+      const roundedNewKwh = Math.round(newKwh * 100) / 100;
+      
+      const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
       const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
         ? updateResult[0][0].affected_rows 
         : 0;
@@ -70,11 +72,11 @@ export class RechargeService {
     if (amount !== undefined && kwh === undefined) {
       // Amount provided, calculate kWh
       const kwhPrice = await this.getKwhPrice(conn);
-      calculatedKwh = amount / kwhPrice;
+      calculatedKwh = Math.round((amount / kwhPrice) * 100) / 100;
     } else if (kwh !== undefined && amount === undefined) {
       // kWh provided, calculate amount
       const kwhPrice = await this.getKwhPrice(conn);
-      calculatedAmount = kwh * kwhPrice;
+      calculatedAmount = Math.round((kwh * kwhPrice) * 100) / 100;
     } else if (amount === undefined && kwh === undefined) {
       throw new Error('Either amount or kwh must be provided');
     }
@@ -87,7 +89,9 @@ export class RechargeService {
     const newBalance = card.current_balance + calculatedAmount;
     const newKwh = card.current_kwh + calculatedKwh;
     
-    const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, newKwh]);
+    const roundedNewKwh = Math.round(newKwh * 100) / 100;
+    
+    const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
     const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
       ? updateResult[0][0].affected_rows 
       : 0;
