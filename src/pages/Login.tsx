@@ -33,7 +33,6 @@ export default function Login() {
     try {
       await login({ username, password });
       setSuccess('Inicio de sesión exitoso');
-      // notify the app that auth state changed so the top nav can update
       window.dispatchEvent(new Event('auth-changed'));
       setTimeout(() => navigate('/dashboard'), 500);
     } catch (err: any) {
