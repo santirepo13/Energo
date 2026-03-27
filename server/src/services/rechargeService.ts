@@ -7,31 +7,31 @@ console.log('Loading recharge service');
 export class RechargeService {
   constructor(private pool: Pool) {}
 
-  async recharge(userId: number, amount: number, kwh: number, cardNumber: string): Promise<{ pin: string; balance: number; kwh: number }> {
-    const conn = await this.pool.getConnection();
-    try {
-      await conn.beginTransaction();
+  async recharge(userId: number, amount: number, kwh: number, cardNumber: string, pinCode?: string): Promise<{ pin: string; balance: number; kwh: number }> {
+  const conn = await this.pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    
+    const card = await this.getCardForRecharge(conn, userId, cardNumber);
+    if (!card) {
+      throw new Error('No energy card for user with that card_number');
+    }
+    
+    // Handle pin code recharge flow
+    if (pinCode) {
+      // For pin code recharges, use the provided balance and kwh values
+      const [pinResult]: any = await conn.query(
+        'SELECT amount_cop, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ? AND used = 0',
+        [pinCode, userId]
+      );
       
-      const card = await this.getCardForRecharge(conn, userId, cardNumber);
-      if (!card) {
-        throw new Error('No energy card for user with that card_number');
+      if (!Array.isArray(pinResult) || pinResult.length === 0) {
+        throw new Error('Invalid or already used pin code');
       }
       
-      // Calculate the missing value based on the provided one
-      let calculatedAmount = amount;
-      let calculatedKwh = kwh;
-      
-      if (amount !== undefined && kwh === undefined) {
-        // Amount provided, calculate kWh
-        const kwhPrice = await this.getKwhPrice(conn);
-        calculatedKwh = amount / kwhPrice;
-      } else if (kwh !== undefined && amount === undefined) {
-        // kWh provided, calculate amount
-        const kwhPrice = await this.getKwhPrice(conn);
-        calculatedAmount = kwh * kwhPrice;
-      } else if (amount === undefined && kwh === undefined) {
-        throw new Error('Either amount or kwh must be provided');
-      }
+      const pinData = pinResult[0];
+      const calculatedAmount = pinData.amount_cop;
+      const calculatedKwh = pinData.kwh;
       
       const newBalance = card.current_balance + calculatedAmount;
       const newKwh = card.current_kwh + calculatedKwh;
@@ -44,6 +44,9 @@ export class RechargeService {
       if (affectedRows !== 1) {
         throw new Error('Failed to update energy card balance: no rows affected');
       }
+      
+      // Mark the pin as used
+      await conn.query('UPDATE recharge_pins SET used = 1, used_at = NOW() WHERE pin_code = ?', [pinCode]);
       
       // Fetch the actual updated balance from the database
       const [updatedCardResult]: any = await conn.query(
@@ -58,18 +61,64 @@ export class RechargeService {
       const actualBalance = updatedCardResult[0].current_balance;
       const actualKwh = updatedCardResult[0].current_kwh;
       
-      const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
-      await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
-      
       await conn.commit();
-      return { pin, balance: actualBalance, kwh: actualKwh };
-    } catch (e) {
-      await conn.rollback();
-      throw e;
-    } finally {
-      conn.release();
+      return { pin: pinCode, balance: actualBalance, kwh: actualKwh };
     }
+    
+    // Original amount/kwh recharge flow
+    // Calculate the missing value based on the provided one
+    let calculatedAmount = amount;
+    let calculatedKwh = kwh;
+    
+    if (amount !== undefined && kwh === undefined) {
+      // Amount provided, calculate kWh
+      const kwhPrice = await this.getKwhPrice(conn);
+      calculatedKwh = amount / kwhPrice;
+    } else if (kwh !== undefined && amount === undefined) {
+      // kWh provided, calculate amount
+      const kwhPrice = await this.getKwhPrice(conn);
+      calculatedAmount = kwh * kwhPrice;
+    } else if (amount === undefined && kwh === undefined) {
+      throw new Error('Either amount or kwh must be provided');
+    }
+    
+    const newBalance = card.current_balance + calculatedAmount;
+    const newKwh = card.current_kwh + calculatedKwh;
+    
+    const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, newKwh]);
+    const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
+      ? updateResult[0][0].affected_rows 
+      : 0;
+    
+    if (affectedRows !== 1) {
+      throw new Error('Failed to update energy card balance: no rows affected');
+    }
+    
+    // Fetch the actual updated balance from the database
+    const [updatedCardResult]: any = await conn.query(
+      'SELECT current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ?',
+      [userId, cardNumber]
+    );
+    
+    if (!Array.isArray(updatedCardResult) || updatedCardResult.length === 0) {
+      throw new Error('Failed to retrieve updated card balance');
+    }
+    
+    const actualBalance = updatedCardResult[0].current_balance;
+    const actualKwh = updatedCardResult[0].current_kwh;
+    
+    const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
+    await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
+    
+    await conn.commit();
+    return { pin, balance: actualBalance, kwh: actualKwh };
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
   }
+}
 
   async getRechargeHistory(userId: number): Promise<RechargeTransaction[]> {
     const conn = await this.pool.getConnection();
