@@ -17,12 +17,13 @@ export const validationSchemas = {
   }),
   
   recharge: Joi.object({
-    amount: Joi.number().min(0).optional(),
-    kwh: Joi.number().min(0).optional(),
-    card_number: Joi.string().optional(),
-  }).xor('amount', 'kwh').messages({
-    'object.xor': 'Debe proporcionar ya sea amount o kwh, pero no ambos'
-  }),
+  amount: Joi.number().min(0).optional(),
+  kwh: Joi.number().min(0).optional(),
+  card_number: Joi.string().optional(),
+  pin_code: Joi.string().optional(),
+}).xor('amount', 'kwh', 'pin_code').messages({
+  'object.xor': 'Debe proporcionar ya sea amount, kwh o pin_code, pero solo uno'
+}),
   
   passwordChange: Joi.object({
     current_password: Joi.string().required(),
