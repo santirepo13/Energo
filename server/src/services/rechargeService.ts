@@ -33,6 +33,11 @@ export class RechargeService {
       const calculatedAmount = pinData.amount;
       const calculatedKwh = pinData.kwh;
       
+      // Validate calculated values are valid numbers
+      if (isNaN(calculatedAmount) || isNaN(calculatedKwh)) {
+        throw new Error('Invalid pin data: amount and kwh must be valid numbers');
+      }
+      
       const newBalance = card.current_balance + calculatedAmount;
       const newKwh = card.current_kwh + calculatedKwh;
       
@@ -72,19 +77,24 @@ export class RechargeService {
     if (amount !== undefined && kwh === undefined) {
       // Amount provided, calculate kWh
       const kwhPrice = await this.getKwhPrice(conn);
-      if (kwhPrice <= 0) {
-        throw new Error('Invalid KWh price: must be greater than 0');
+      if (isNaN(kwhPrice) || kwhPrice <= 0) {
+        throw new Error('Invalid KWh price: must be a valid positive number');
       }
       calculatedKwh = Math.round((amount / kwhPrice) * 100) / 100;
     } else if (kwh !== undefined && amount === undefined) {
       // kWh provided, calculate amount
       const kwhPrice = await this.getKwhPrice(conn);
-      if (kwhPrice <= 0) {
-        throw new Error('Invalid KWh price: must be greater than 0');
+      if (isNaN(kwhPrice) || kwhPrice <= 0) {
+        throw new Error('Invalid KWh price: must be a valid positive number');
       }
       calculatedAmount = Math.round((kwh * kwhPrice) * 100) / 100;
     } else if (amount === undefined && kwh === undefined) {
       throw new Error('Either amount or kwh must be provided');
+    }
+    
+    // Validate calculated values are valid numbers immediately after calculation
+    if (isNaN(calculatedAmount) || isNaN(calculatedKwh)) {
+      throw new Error('Invalid calculated values: amount and kwh must be valid numbers');
     }
     
     // Validate calculated kWh does not exceed database limits
@@ -118,14 +128,6 @@ export class RechargeService {
     
     const actualBalance = updatedCardResult[0].current_balance;
     const actualKwh = updatedCardResult[0].current_kwh;
-    
-    // Ensure calculatedAmount and calculatedKwh are not undefined or NaN before database query
-    if (calculatedAmount === undefined || isNaN(calculatedAmount)) {
-      throw new Error('Invalid amount: must be a valid number');
-    }
-    if (calculatedKwh === undefined || isNaN(calculatedKwh)) {
-      throw new Error('Invalid kwh: must be a valid number');
-    }
     
     const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
     await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
