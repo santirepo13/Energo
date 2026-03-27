@@ -72,10 +72,16 @@ export class RechargeService {
     if (amount !== undefined && kwh === undefined) {
       // Amount provided, calculate kWh
       const kwhPrice = await this.getKwhPrice(conn);
+      if (kwhPrice <= 0) {
+        throw new Error('Invalid KWh price: must be greater than 0');
+      }
       calculatedKwh = Math.round((amount / kwhPrice) * 100) / 100;
     } else if (kwh !== undefined && amount === undefined) {
       // kWh provided, calculate amount
       const kwhPrice = await this.getKwhPrice(conn);
+      if (kwhPrice <= 0) {
+        throw new Error('Invalid KWh price: must be greater than 0');
+      }
       calculatedAmount = Math.round((kwh * kwhPrice) * 100) / 100;
     } else if (amount === undefined && kwh === undefined) {
       throw new Error('Either amount or kwh must be provided');
@@ -198,7 +204,11 @@ export class RechargeService {
     if (!Array.isArray(rows) || rows.length === 0) {
       throw new Error('KWh price not found in settings');
     }
-    return parseFloat(rows[0].value);
+    const parsedValue = parseFloat(rows[0].value);
+    if (isNaN(parsedValue) || parsedValue <= 0) {
+      throw new Error('Invalid KWh price: must be a positive number');
+    }
+    return parsedValue;
   }
 
   private luhnCheckDigit(bodyDigits: string): string {
