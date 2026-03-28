@@ -101,7 +101,7 @@ export class App {
     const { RechargeService } = require('./services/rechargeService');
 
     const authRoutes = createAuthRoutes(new AuthService(dbPool), authMiddleware);
-    const userRoutes = createUserRoutes(new UserService(dbPool), authMiddleware);
+    const userRoutes = createUserRoutes(new UserService(dbPool), authMiddleware, new RechargeService(dbPool));
     const energyCardRoutes = createEnergyCardRoutes(new EnergyCardService(dbPool), authMiddleware);
     const rechargeRoutes = createRechargeRoutes(new RechargeService(dbPool), authMiddleware);
     const adminRoutes = createAdminRoutes(new UserService(dbPool), new EnergyCardService(dbPool), authMiddleware);

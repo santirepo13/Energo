@@ -3,10 +3,15 @@ import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { UserService } from '../services/userService';
 import { EnergyCardService } from '../services/energyCardService';
+import { RechargeService } from '../services/rechargeService';
 
 console.log('Loading user routes');
 
-export const createUserRoutes = (userService: UserService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
+export const createUserRoutes = (
+  userService: UserService,
+  authMiddleware: ReturnType<typeof createAuthMiddleware>,
+  rechargeService: RechargeService
+) => {
   const router = Router();
 
   router.get('/profile', authMiddleware.requireAuth, async (req, res) => {
@@ -16,7 +21,8 @@ export const createUserRoutes = (userService: UserService, authMiddleware: Retur
       const dbPool = (req.app.get('dbPool') as any);
       const energyCardService = new EnergyCardService(dbPool);
       const cards = await energyCardService.getCardsByUser(userId);
-      res.json({ user, profile, personal_data_filled: personalDataFilled, cards });
+      const rechargeHistory = await rechargeService.getRechargeHistory(userId);
+      res.json({ user, profile, personal_data_filled: personalDataFilled, cards, recharge_history: rechargeHistory });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load profile' });
     }

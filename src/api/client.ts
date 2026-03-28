@@ -202,6 +202,21 @@ export type MeProfileResponse = {
   email: string;           // correo de registro (solo lectura en UI)
   profile: UserProfile | null;
   personal_data_filled?: boolean; // bandera desde BD: 1 cuando ya llenó dirección y teléfono al menos una vez
+  cards?: Array<{
+    card_number: string;
+    name?: string | null;
+    current_balance: number;
+    current_kwh: number;
+  }>;
+  recharge_history?: Array<{
+    user_id?: number;
+    email?: string | null;
+    pin_code: string;
+    amount: number;
+    kwh: number;
+    created_at: string;
+    card_number: string;
+  }>;
 };
 
 // Obtener perfil propio

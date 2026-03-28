@@ -13,10 +13,30 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
 } from '@mui/material';
+import HistoryIcon from '@mui/icons-material/History';
 import { meGetProfile, meUpdateProfile, type MeProfileResponse, type UpdateProfileRequest } from '../api/client';
 
 const DOC_TYPES = ['CC','CE','Pasaporte','PEP','RIF'] as const;
+
+const currencyCOP = new Intl.NumberFormat('es-CO', {
+  style: 'currency',
+  currency: 'COP',
+  maximumFractionDigits: 0,
+});
+
+function formatCOP(n: number) {
+  return currencyCOP.format(Math.round(n));
+}
+
+function formatKwh(n: number) {
+  return `${Number(n).toFixed(2)} kWh`;
+}
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -36,6 +56,10 @@ export default function ProfilePage() {
   });
 
   const [isFirstFill, setIsFirstFill] = useState(false);
+
+  // Recharge history state
+  const [rechargeHistory, setRechargeHistory] = useState<MeProfileResponse['recharge_history']>([]);
+  const [cardNameMap, setCardNameMap] = useState<Record<string, string>>({});
 
   // UI/flow control for one-time document change
   const [docEditEnabled, setDocEditEnabled] = useState(false);
@@ -71,6 +95,14 @@ export default function ProfilePage() {
           });
         }
         setIsFirstFill(!(res.personal_data_filled === true));
+        setRechargeHistory(res.recharge_history ?? []);
+        if (res.cards) {
+          const map: Record<string, string> = {};
+          res.cards.forEach((c) => {
+            map[c.card_number] = c.name ?? '';
+          });
+          setCardNameMap(map);
+        }
       } catch (e: any) {
         setError(e?.response?.data?.error || e?.message || 'Error al cargar el perfil');
       }
@@ -299,6 +331,44 @@ export default function ProfilePage() {
             &nbsp;<a href="https://www.sic.gov.co/sites/default/files/normatividad/LEY_1581_2012.pdf" target="_blank" rel="noopener noreferrer">este enlace</a>.
           </Typography>
         </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <HistoryIcon color="primary" />
+          <Typography variant="h6">Historial de Recargas</Typography>
+        </Stack>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Fecha</TableCell>
+              <TableCell>PIN</TableCell>
+              <TableCell>Medidor</TableCell>
+              <TableCell align="right">Monto (COP)</TableCell>
+              <TableCell align="right">kWh</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rechargeHistory.map((r, idx) => (
+              <TableRow key={idx}>
+                <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
+                <TableCell>
+                  <code style={{ letterSpacing: 1 }}>{r.pin_code}</code>
+                </TableCell>
+                <TableCell>{cardNameMap[r.card_number] || r.card_number}</TableCell>
+                <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
+                <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
+              </TableRow>
+            ))}
+            {rechargeHistory.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  Sin recargas todavía.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </Paper>
 
     </Stack>
