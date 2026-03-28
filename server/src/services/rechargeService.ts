@@ -42,6 +42,10 @@ export class RechargeService {
       
       const roundedNewKwh = Math.round(newKwh * 100) / 100;
       
+      if (!Number.isFinite(newBalance) || !Number.isFinite(roundedNewKwh)) {
+        throw new Error('Invalid card balance or kwh values');
+      }
+      
       const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
       const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
         ? updateResult[0][0].affected_rows 
@@ -110,6 +114,10 @@ export class RechargeService {
     const newKwh = card.current_kwh + calculatedKwh;
     
     const roundedNewKwh = Math.round(newKwh * 100) / 100;
+    
+    if (!Number.isFinite(newBalance) || !Number.isFinite(roundedNewKwh)) {
+      throw new Error('Invalid card balance or kwh values');
+    }
     
     const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
     const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
