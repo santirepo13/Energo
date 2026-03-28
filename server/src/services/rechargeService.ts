@@ -215,14 +215,12 @@ export class RechargeService {
   }
 
   private async getKwhPrice(conn: any): Promise<number> {
-    const [rows]: any = await conn.query(
-      'SELECT CAST(value AS DECIMAL(10,2)) as kwh_price FROM settings WHERE `key` = ? LIMIT 1',
-      ['kwh_price']
-    );
-    if (!Array.isArray(rows) || rows.length === 0) {
+    const [rows]: any = await conn.query('CALL sp_settings_get(?)', ['kwh_price']);
+    const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
+    if (!Array.isArray(firstSet) || firstSet.length === 0) {
       throw new Error('KWh price not found in settings');
     }
-    const parsedValue = rows[0].kwh_price;
+    const parsedValue = parseFloat(firstSet[0].value);
     if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
       throw new Error('Invalid KWh price: must be a positive number');
     }
