@@ -74,7 +74,7 @@ export default function Dashboard() {
   const [kwhDialogSaving, setKwhDialogSaving] = useState(false);
   const [kwhDialogError, setKwhDialogError] = useState<string | null>(null);
 
-  const cost = data?.cost_per_kwh ?? 861.88;
+  const cost = data?.kwh_price ?? 861.88;
   const userStatus = data?.current_user?.status ?? null;
   const isPaused = userStatus === 'Pausa';
   const role = (data?.current_user?.role ?? null) as string | null;
@@ -230,7 +230,7 @@ export default function Dashboard() {
               ...(prev.recharge_history ?? []),
             ],
           security_logs: prev.security_logs,
-          cost_per_kwh: prev.cost_per_kwh,
+          kwh_price: prev.kwh_price,
         };
         return next;
       });
@@ -265,7 +265,7 @@ export default function Dashboard() {
       // Update local dashboard state with new cost
       setData((prev) => {
         if (!prev) return prev;
-        return { ...prev, cost_per_kwh: res.cost_per_kwh ?? v } as DashboardResponse;
+        return { ...prev, kwh_price: res.kwh_price ?? v } as DashboardResponse;
       });
       setKwhDialogOpen(false);
       setKwhDialogPrice('');

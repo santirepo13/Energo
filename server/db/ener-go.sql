@@ -303,6 +303,11 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_set_kwh_price` (IN `p_admin_user
   DECLARE v_old_price DECIMAL(10,2);
   SELECT price_cop INTO v_old_price FROM kwh_price_history ORDER BY id DESC LIMIT 1;
   INSERT INTO kwh_price_history (admin_user_id, price_cop) VALUES (p_admin_user_id, p_price);
+  INSERT INTO settings (`key`,`value`,`created_at`,`updated_at`)
+  VALUES ('kwh_price', p_price, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  ON DUPLICATE KEY UPDATE
+    `value` = VALUES(`value`),
+    `updated_at` = CURRENT_TIMESTAMP;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_statuses_get_id_by_name`$$
@@ -783,6 +788,7 @@ CREATE TABLE IF NOT EXISTS `user_flags` (
   `user_id` int NOT NULL,
   `personal_data_filled` tinyint(1) NOT NULL DEFAULT '0',
   `filled_at` timestamp NULL DEFAULT NULL,
+  `document_change_used` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

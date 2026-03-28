@@ -215,7 +215,7 @@ export class RechargeService {
   }
 
   private async getKwhPrice(conn: any): Promise<number> {
-    const [rows]: any = await conn.query('SELECT value FROM settings WHERE \`key\` = ?', ['cost_per_kwh']);
+    const [rows]: any = await conn.query('SELECT value FROM settings WHERE \`key\` = ?', ['kwh_price']);
     if (!Array.isArray(rows) || rows.length === 0) {
       throw new Error('KWh price not found in settings');
     }

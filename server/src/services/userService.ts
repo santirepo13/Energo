@@ -125,6 +125,8 @@ export class UserService {
     if (used) {
       throw new Error('Ya usó su cambio de documento anteriormente')
     }
+    
+    await this.markDocumentChangeUsed(conn, userId);
   }
 
   private async updateUserProfile(conn: any, userId: number, profileData: any): Promise<void> {
@@ -171,6 +173,13 @@ export class UserService {
     );
   }
 
+  private async markDocumentChangeUsed(conn: any, userId: number): Promise<void> {
+    await conn.query(
+      'UPDATE user_flags SET document_change_used = 1 WHERE user_id = ?',
+      [userId]
+    );
+  }
+
   private async getUserPasswordHash(conn: any, userId: number): Promise<User | null> {
     const [rows]: any = await conn.query(
       'SELECT id, username, email, password FROM users WHERE id = ? LIMIT 1',
@@ -210,7 +219,7 @@ export class UserService {
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
 
-  async updateKwhPrice(adminUserId: number, price: number): Promise<{ cost_per_kwh: number }> {
+  async updateKwhPrice(adminUserId: number, price: number): Promise<{ kwh_price: number }> {
     const conn = await this.pool.getConnection();
     try {
       // Call the stored procedure
@@ -218,15 +227,15 @@ export class UserService {
       
       // Get the updated price from settings
       const [priceRows]: any = await conn.query(
-        'SELECT CAST(value AS DECIMAL(10,2)) as cost_per_kwh FROM settings WHERE `key` = ? LIMIT 1',
-        ['cost_per_kwh']
+        'SELECT CAST(value AS DECIMAL(10,2)) as kwh_price FROM settings WHERE `key` = ? LIMIT 1',
+        ['kwh_price']
       );
       
       if (!Array.isArray(priceRows) || priceRows.length === 0) {
         throw new Error('Failed to retrieve updated kWh price');
       }
       
-      return { cost_per_kwh: priceRows[0].cost_per_kwh };
+      return { kwh_price: priceRows[0].kwh_price };
     } finally {
       conn.release();
     }

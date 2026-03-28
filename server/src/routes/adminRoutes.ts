@@ -132,7 +132,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
       
       // Call stored procedure to update kWh price
       const result = await userService.updateKwhPrice(userId, price);
-      res.json({ message: 'KWh price updated', cost_per_kwh: result.cost_per_kwh });
+      res.json({ message: 'KWh price updated', kwh_price: result.kwh_price });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to update kWh price' });
     }

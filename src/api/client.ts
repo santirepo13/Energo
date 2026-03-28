@@ -61,7 +61,7 @@ export type DashboardResponse = {
     ip_address: string;
     details: string;
   }>;
-  cost_per_kwh: number;
+  kwh_price: number;
 };
 
 export async function login(data: LoginRequest) {
@@ -389,7 +389,7 @@ export async function auditGetMetrics(days = 30) {
 
 export async function adminUpdateKwhPrice(price: number) {
   const res = await api.post(`/api/admin/kwh-price`, { price });
-  return res.data as { message: string; cost_per_kwh: number };
+  return res.data as { message: string; kwh_price: number };
 }
 
 // ==== Mock Pausa Verification ====
