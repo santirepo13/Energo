@@ -125,10 +125,10 @@ export class App {
     this.initializeErrorHandling();
     const config = loadAppConfig();
     const port = config.port;
-    
+
     console.log('Starting server...');
     console.log('Config:', config);
-    
+
     this.app.listen(port, '0.0.0.0', () => {
       console.log(`Server running on port ${port}`);
     console.log('Available routes:');

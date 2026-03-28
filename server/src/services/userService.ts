@@ -128,9 +128,31 @@ export class UserService {
   }
 
   private async updateUserProfile(conn: any, userId: number, profileData: any): Promise<void> {
+    const validColumns = [
+      'primer_nombre',
+      'segundo_nombre',
+      'primer_apellido',
+      'segundo_apellido',
+      'tipo_identificacion',
+      'numero_identificacion',
+      'direccion',
+      'telefono'
+    ];
+
+    const filteredData: any = {};
+    for (const key of validColumns) {
+      if (key in profileData) {
+        const value = profileData[key];
+        if (typeof value === 'number' && !Number.isFinite(value)) {
+          throw new Error(`Invalid value for field ${key}: must be a valid number`);
+        }
+        filteredData[key] = value;
+      }
+    }
+
     await conn.query(
       'UPDATE user_profiles SET ? WHERE user_id = ?',
-      [profileData, userId]
+      [filteredData, userId]
     );
   }
 
