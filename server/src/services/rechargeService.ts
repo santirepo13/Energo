@@ -159,10 +159,11 @@ export class RechargeService {
     const conn = await this.pool.getConnection();
     try {
       const [rows]: any = await conn.query(
-        'SELECT * FROM recharge_pins WHERE user_id = ? ORDER BY created_at DESC',
+        'CALL sp_recharge_pins_list_by_user(?)',
         [userId]
       );
-      return Array.isArray(rows) ? rows : [];
+      const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
+      return Array.isArray(firstSet) ? firstSet : [];
     } finally {
       conn.release();
     }

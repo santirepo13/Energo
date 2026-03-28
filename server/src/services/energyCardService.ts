@@ -10,10 +10,11 @@ export class EnergyCardService {
     const conn = await this.pool.getConnection();
     try {
       const [rows]: any = await conn.query(
-        'SELECT * FROM energy_cards WHERE user_id = ?',
+        'CALL sp_energy_cards_list_by_user(?)',
         [userId]
       );
-      return Array.isArray(rows) ? rows : [];
+      const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
+      return Array.isArray(firstSet) ? firstSet : [];
     } finally {
       conn.release();
     }
@@ -23,10 +24,11 @@ export class EnergyCardService {
     const conn = await this.pool.getConnection();
     try {
       const [rows]: any = await conn.query(
-        'SELECT * FROM energy_cards WHERE user_id = ? AND card_number = ?',
+        'CALL sp_energy_cards_get_by_user_and_card(?, ?)',
         [userId, cardNumber]
       );
-      return Array.isArray(rows) && rows.length ? rows[0] : null;
+      const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
+      return Array.isArray(firstSet) && firstSet.length ? firstSet[0] : null;
     } finally {
       conn.release();
     }
