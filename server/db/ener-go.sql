@@ -217,6 +217,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_energy_cards_update_balance` (IN
       last_recharge  = CURRENT_TIMESTAMP
   WHERE user_id = p_user_id
     AND card_number = CONVERT(p_card_number USING utf8mb4) COLLATE utf8mb4_general_ci;
+  SELECT ROW_COUNT() AS affected_rows;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_energy_cards_update_name_by_user_and_card`$$
