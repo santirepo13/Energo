@@ -37,8 +37,8 @@ export class RechargeService {
         throw new Error('Invalid pin data: amount and kwh must be finite numbers');
       }
       
-      const newBalance = card.current_balance + calculatedAmount;
-      const newKwh = card.current_kwh + calculatedKwh;
+      const newBalance = Number(card.current_balance) + calculatedAmount;
+      const newKwh = Number(card.current_kwh) + calculatedKwh;
       
       const roundedNewKwh = Math.round(newKwh * 100) / 100;
       
@@ -110,8 +110,8 @@ export class RechargeService {
       throw new Error('Calculated kWh exceeds maximum allowed value');
     }
     
-    const newBalance = card.current_balance + calculatedAmount;
-    const newKwh = card.current_kwh + calculatedKwh;
+    const newBalance = Number(card.current_balance) + calculatedAmount;
+    const newKwh = Number(card.current_kwh) + calculatedKwh;
     
     const roundedNewKwh = Math.round(newKwh * 100) / 100;
     

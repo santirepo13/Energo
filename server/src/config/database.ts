@@ -23,6 +23,7 @@ export const createDatabasePool = (config: DatabaseConfig): mysql.Pool => {
     waitForConnections: config.waitForConnections,
     connectionLimit: config.connectionLimit,
     queueLimit: config.queueLimit,
+    decimalNumbers: true,
   });
 };
 
