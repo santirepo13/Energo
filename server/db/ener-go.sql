@@ -140,6 +140,11 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_energy_cards_find_by_card_number
   LIMIT 1;
 END$$
 
+DROP PROCEDURE IF EXISTS `sp_energy_cards_get_by_id`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_energy_cards_get_by_id` (IN `p_id` INT)   BEGIN
+  SELECT * FROM energy_cards WHERE id = p_id LIMIT 1;
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_energy_cards_get_by_user_and_card`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_energy_cards_get_by_user_and_card` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50))   BEGIN
   SELECT card_number, name, current_balance, current_kwh, last_recharge

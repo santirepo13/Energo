@@ -131,10 +131,11 @@ export class EnergyCardService {
 
   private async getCardById(conn: any, id: number): Promise<EnergyCard | null> {
     const [rows]: any = await conn.query(
-      'SELECT * FROM energy_cards WHERE id = ?',
+      'CALL sp_energy_cards_get_by_id(?)',
       [id]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
+    return Array.isArray(firstSet) && firstSet.length ? firstSet[0] : null;
   }
 }
 
