@@ -118,7 +118,9 @@ export class UserRepository {
 
   async getAllUsers(): Promise<User[]> {
     const [rows]: any = await this.db('CALL sp_admin_list_users()');
-    return Array.isArray(rows) ? rows : [];
+    // Unwrap the result set from CALL statement
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async updateUserEmail(userId: number, email: string): Promise<void> {
