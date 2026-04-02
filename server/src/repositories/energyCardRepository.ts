@@ -21,7 +21,8 @@ export class EnergyCardRepository implements IEnergyCardRepository {
       'CALL sp_energy_cards_find_by_card_number(?)',
       [cardNumber]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    // rows = [[result_set_rows], OkPacket], so rows[0] = [result_set_rows], rows[0][0] = first row object
+    return Array.isArray(rows) && rows.length && Array.isArray(rows[0]) && rows[0].length ? rows[0][0] : null;
   }
 
   async findByUserId(userId: number): Promise<EnergyCard[]> {
@@ -38,7 +39,8 @@ export class EnergyCardRepository implements IEnergyCardRepository {
       'CALL sp_energy_cards_get_by_user_and_card(?, ?)',
       [userId, cardNumber]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    // rows = [[result_set_rows], OkPacket], so rows[0] = [result_set_rows], rows[0][0] = first row object
+    return Array.isArray(rows) && rows.length && Array.isArray(rows[0]) && rows[0].length ? rows[0][0] : null;
   }
 
   async create(userId: number, cardNumber: string, name: string | null): Promise<number> {
