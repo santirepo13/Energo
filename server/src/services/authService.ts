@@ -194,6 +194,14 @@ export class AuthService {
     );
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
+
+  async validatePasswordResetToken(tokenHash: string): Promise<{ valid: boolean; userId?: number; username?: string }> {
+    return await this.userRepository.validatePasswordResetToken(tokenHash);
+  }
+
+  async resetPasswordWithToken(tokenHash: string, newPasswordHash: string): Promise<boolean> {
+    return await this.userRepository.resetPasswordWithToken(tokenHash, newPasswordHash);
+  }
 }
 
 async function callFirst<T = any>(db: DatabaseFunction, proc: string, params: any[] = []): Promise<T | null> {

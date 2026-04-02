@@ -25,14 +25,8 @@ import LinkOffIcon from '@mui/icons-material/LinkOff';
 import MailLockIcon from '@mui/icons-material/MailLock';
 import EditIcon from '@mui/icons-material/Edit';
 import { useParams } from 'react-router-dom';
-import { api } from '../api/client';
+import { adminGetUserDetail, adminGetUserLogs, adminSendPasswordReset, adminUpdateUserEmail, adminLinkMeterToUser, adminRemoveUserMeter, adminSuspendUser, adminUnsuspendUser } from '../api/client';
 import type { AdminUserRow, UserProfile, UserMeter } from '../api/client';
-
-type DetailResponse = {
-  user: AdminUserRow;
-  profile: UserProfile | null;
-  meters: UserMeter[];
-};
 
 type LogRow = {
   id?: number;
@@ -69,15 +63,19 @@ export default function AdminUserDetail() {
     setError(null);
     try {
       const [dRes, lRes] = await Promise.all([
-        api.get(`/admin/users/${userId}`),
-        api.get(`/admin/users/${userId}/logs`),
+        adminGetUserDetail(userId),
+        adminGetUserLogs(userId),
       ]);
-      const d = dRes.data as DetailResponse;
-      setUser(d.user);
-      setProfile(d.profile);
-      setMeters(d.meters || []);
-      const L = (lRes.data?.logs as LogRow[]) || [];
-      setLogs(L);
+      setUser(dRes.user);
+      setProfile(null);
+      setMeters((dRes.user.meters || []).map(m => ({
+        card_number: m.card_number,
+        name: m.name,
+        current_balance: m.current_balance,
+        current_kwh: m.current_kwh,
+        last_recharge: m.linked_at,
+      })));
+      setLogs(lRes.logs || []);
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'No se pudo cargar el usuario');
     } finally {
@@ -135,9 +133,8 @@ export default function AdminUserDetail() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await api.post(`/admin/users/${user.id}/send-reset`);
-      const link = res?.data?.link;
-      setSuccess(link ? `Enlace de restablecimiento: ${link}` : 'Enlace de restablecimiento generado');
+      await adminSendPasswordReset(user.id);
+      setSuccess('Enlace de restablecimiento generado');
       await load();
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'No se pudo enviar el enlace');
@@ -157,7 +154,7 @@ export default function AdminUserDetail() {
     setError(null);
     setSuccess(null);
     try {
-      await api.patch(`/admin/users/${user.id}/email`, { email });
+      await adminUpdateUserEmail(user.id, email);
       setSuccess('Correo actualizado');
       setEmailDlgOpen(false);
       setNewEmail('');
@@ -180,7 +177,7 @@ export default function AdminUserDetail() {
     setError(null);
     setSuccess(null);
     try {
-      await api.post(`/admin/users/${user.id}/meters/link`, { card_number: card });
+      await adminLinkMeterToUser(user.id, card);
       setSuccess('Medidor vinculado');
       setLinkDlgOpen(false);
       setLinkSerial('');
@@ -198,7 +195,7 @@ export default function AdminUserDetail() {
     setError(null);
     setSuccess(null);
     try {
-      await api.delete(`/admin/users/${user.id}/meters/${encodeURIComponent(card_number)}`);
+      await adminRemoveUserMeter(user.id, card_number);
       setSuccess('Medidor desvinculado');
       await load();
     } catch (e: any) {
@@ -219,7 +216,7 @@ export default function AdminUserDetail() {
     setError(null);
     setSuccess(null);
     try {
-      await api.post(`/admin/users/${user.id}/suspend`, { reason });
+      await adminSuspendUser(user.id);
       setSuccess('Cuenta suspendida');
       setSuspendDlgOpen(false);
       setSuspendReason('');
@@ -237,7 +234,7 @@ export default function AdminUserDetail() {
     setError(null);
     setSuccess(null);
     try {
-      await api.post(`/admin/users/${user.id}/unsuspend`);
+      await adminUnsuspendUser(user.id);
       setSuccess('Cuenta reactivada');
       await load();
     } catch (e: any) {

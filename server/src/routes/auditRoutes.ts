@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { createAuthMiddleware } from '../middleware/auth';
+import { createValidationMiddleware } from '../middleware/validation';
 import { AuditService } from '../services/auditService';
+import { UserService } from '../services/userService';
 
 console.log('Cargando rutas de auditoría');
 
-export const createAuditRoutes = (auditService: AuditService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
+export const createAuditRoutes = (auditService: AuditService, userService: UserService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();
 
   // Admin-only middleware
@@ -17,6 +19,18 @@ export const createAuditRoutes = (auditService: AuditService, authMiddleware: Re
       res.json({ admins });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load audit admins' });
+    }
+  });
+
+  // Update admin profile (auditor only) - uses existing user profile update logic
+  router.put('/admins/:id/profile', requireAdmin, createValidationMiddleware().validate('profileUpdate'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const profileData = req.body;
+      await userService.updateProfile(Number(id), profileData);
+      res.json({ message: 'Profile updated' });
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to update profile' });
     }
   });
 

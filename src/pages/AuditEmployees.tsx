@@ -53,7 +53,7 @@ export default function AuditEmployeesPage() {
     setEmpError(null);
     try {
       const res = await auditGetEmployees();
-      setEmployees(res.users);
+      setEmployees(res.employees);
     } catch (e: any) {
       setEmpError(e?.response?.data?.error || e?.message || 'No se pudieron cargar los empleados');
     } finally {

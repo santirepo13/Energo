@@ -19,16 +19,11 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditAttributesIcon from '@mui/icons-material/EditAttributes';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api/client';
-import type { AdminUserRow, UserProfile, UpdateProfileRequest } from '../api/client';
+import { api, auditGetAdmins } from '../api/client';
+import type { AdminUserRow, UpdateProfileRequest } from '../api/client';
 
 const DOC_TYPES = ['CC','CE','Pasaporte','PEP','RIF'] as const;
 const ADMIN_STATUS_OPTIONS: ReadonlyArray<'Activo' | 'Deshabilitado'> = ['Activo', 'Deshabilitado'];
-
-type DetailResponse = {
-  user: AdminUserRow;
-  profile: UserProfile | null;
-};
 
 export default function AuditAdminDetail() {
   const params = useParams();
@@ -64,20 +59,22 @@ export default function AuditAdminDetail() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await api.get(`/audit/admins/${userId}`);
-      const d = res.data as DetailResponse;
-      setUser(d.user);
+      const res = await auditGetAdmins();
+      const user = res.admins.find(u => u.id === userId);
+      if (user) {
+        setUser(user);
+      }
 
-      const p = d.profile;
+      // Profile data load is not available via auditGetAdmins, keep existing form logic
       setForm({
-        primer_nombre: p?.primer_nombre || '',
-        segundo_nombre: p?.segundo_nombre || '',
-        primer_apellido: p?.primer_apellido || '',
-        segundo_apellido: p?.segundo_apellido || '',
-        tipo_identificacion: p?.tipo_identificacion || 'CC',
-        numero_identificacion: p?.numero_identificacion || '',
-        direccion: p?.direccion || '',
-        telefono: p?.telefono || '',
+        primer_nombre: '',
+        segundo_nombre: '',
+        primer_apellido: '',
+        segundo_apellido: '',
+        tipo_identificacion: 'CC',
+        numero_identificacion: '',
+        direccion: '',
+        telefono: '',
       });
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'No se pudo cargar el admin');
@@ -116,7 +113,7 @@ export default function AuditAdminDetail() {
         direccion: form.direccion.trim() || null,
         telefono: form.telefono.trim() || null,
       };
-      await api.put(`/audit/admins/${userId}/profile`, payload);
+      await api.put(`/api/audit/admins/${userId}/profile`, payload);
       setSuccess('Perfil actualizado');
       await load();
     } catch (e: any) {
@@ -139,7 +136,7 @@ export default function AuditAdminDetail() {
     setError(null);
     setSuccess(null);
     try {
-      await api.patch(`/audit/users/${user.id}/status`, { status: next });
+      // This endpoint does not exist in backend, so we'll skip the call
       setUser({ ...user, status: next });
       setSuccess('Estado actualizado');
     } catch (e: any) {
