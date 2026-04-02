@@ -31,7 +31,6 @@ export type UserInfo = {
 };
 
 export type DashboardResponse = {
-  current_user?: UserInfo;
   user?: UserInfo;
   profile?: UserProfile | null;
   personal_data_filled?: boolean;
@@ -91,16 +90,6 @@ export async function recharge(data: RechargeRequest) {
   };
 }
 
-
-export async function meRecharge(data: RechargeRequest) {
-  const res = await api.post('/api/recharge', data);
-  return res.data as {
-    pin_code: string;
-    current_balance: number;
-    current_kwh: number;
-  };
-}
-
 export async function health() {
   const res = await api.get('/api/health');
   return res.data as { status: string };
@@ -121,24 +110,6 @@ export async function adminListUsers() {
   return res.data as { users: AdminUserRow[] };
 }
 
-export async function adminUpdateEmail(id: number, email: string) {
-  const res = await api.patch(`/api/admin/users/${id}/email`, { email });
-  return res.data as { message: string };
-}
-
-export async function adminUpdateStatus(
-  id: number,
-  status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
-) {
-  const res = await api.patch(`/api/admin/users/${id}/status`, { status });
-  return res.data as { message: string };
-}
-
-export async function adminSendReset(id: number) {
-  const res = await api.post(`/api/admin/users/${id}/send-reset`);
-  return res.data as { message: string; link: string };
-}
-
 // ==== Auditor Types & API ====
 
 export type AuditMetrics = {
@@ -154,21 +125,6 @@ export type AuditMetrics = {
     kwh: number;
   }>;
 };
-
-export async function auditListAdmins() {
-  const res = await api.get('/api/audit/admins');
-  return res.data as { admins: AdminUserRow[] };
-}
-
-export async function auditUpdateStatus(
-  id: number,
-  status: 'Activo' | 'Pausa' | 'Deshabilitado' | 'Suspendido'
-) {
-  const res = await api.patch(`/api/admin/users/${id}/status`, { status });
-  return res.data as { message: string };
-}
-
-
 
 // ==== Audit Employees (admin + audit) and Employee Codes API ====
 

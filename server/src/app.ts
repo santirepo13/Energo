@@ -105,7 +105,7 @@ export class App {
     const authRoutes = createAuthRoutes(authService, authMiddleware);
     const userRoutes = createUserRoutes(userService, authService, authMiddleware, rechargeService);
     const adminRoutes = createAdminRoutes(userService, energyCardService, adminService, authMiddleware);
-    const auditRoutes = createAuditRoutes(auditService, authMiddleware);
+    const auditRoutes = createAuditRoutes(auditService, userService, authMiddleware);
     const energyCardRoutes = createEnergyCardRoutes(energyCardService, authMiddleware);
     const rechargeRoutes = createRechargeRoutes(rechargeService, authMiddleware);
 

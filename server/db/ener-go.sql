@@ -475,6 +475,43 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_password_reset_token_insert` (IN
   VALUES (p_user_id, p_token_hash, v_expires_at);
 END$$
 
+DROP PROCEDURE IF EXISTS `sp_password_reset_token_validate`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_password_reset_token_validate` (IN `p_token_hash` CHAR(64))   BEGIN
+  SELECT pr.user_id, u.username
+  FROM password_resets pr
+  JOIN users u ON pr.user_id = u.id
+  WHERE pr.token_hash = p_token_hash
+    AND pr.used_at IS NULL
+    AND pr.expires_at > CURRENT_TIMESTAMP
+  LIMIT 1;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_password_reset_with_token`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_password_reset_with_token` (IN `p_token_hash` CHAR(64), IN `p_new_password_hash` VARCHAR(255))   BEGIN
+  DECLARE v_user_id INT;
+  DECLARE v_success INT DEFAULT 0;
+  
+  -- Get user_id for valid token
+  SELECT pr.user_id INTO v_user_id
+  FROM password_resets pr
+  WHERE pr.token_hash = p_token_hash
+    AND pr.used_at IS NULL
+    AND pr.expires_at > CURRENT_TIMESTAMP
+  LIMIT 1;
+  
+  IF v_user_id IS NOT NULL THEN
+    -- Update password
+    UPDATE users SET password_hash = p_new_password_hash, password_changed_at = CURRENT_TIMESTAMP WHERE id = v_user_id;
+    
+    -- Mark token as used
+    UPDATE password_resets SET used_at = CURRENT_TIMESTAMP WHERE token_hash = p_token_hash;
+    
+    SET v_success = 1;
+  END IF;
+  
+  SELECT v_success AS success;
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_user_flags_get_personal_data_filled`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_user_flags_get_personal_data_filled` (IN `p_user_id` INT)   BEGIN
   SELECT personal_data_filled, filled_at FROM user_flags WHERE user_id = p_user_id LIMIT 1;

@@ -153,4 +153,20 @@ export class UserRepository {
     return token;
   }
 
+  async validatePasswordResetToken(tokenHash: string): Promise<{ valid: boolean; userId?: number; username?: string }> {
+    const [rows]: any = await this.db('CALL sp_password_reset_token_validate(?)', [tokenHash]);
+    
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { valid: true, userId: rows[0].user_id, username: rows[0].username };
+    }
+    return { valid: false };
+  }
+
+  async resetPasswordWithToken(tokenHash: string, newPasswordHash: string): Promise<boolean> {
+    const [rows]: any = await this.db('CALL sp_password_reset_with_token(?, ?)', [tokenHash, newPasswordHash]);
+    
+    // The stored procedure returns 1 if successful, 0 if token was invalid
+    return Array.isArray(rows) && rows.length > 0 && rows[0].success === 1;
+  }
+
 }

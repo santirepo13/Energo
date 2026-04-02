@@ -43,7 +43,7 @@ export default function ResetPasswordPage() {
           setValid(false);
           return;
         }
-        const res = await api.get('/password/reset/validate', { params: { token } });
+        const res = await api.get('/api/auth/password/reset/validate', { params: { token } });
         if (!mounted) return;
         setUsername(res.data?.username || '');
         setValid(true);
@@ -70,8 +70,8 @@ export default function ResetPasswordPage() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await api.post('/password/reset/complete', { token, new_password: pw });
-      setSuccess(res.data?.message || 'Contraseña actualizada');
+      await api.post('/api/auth/password/reset', { token, new_password: pw });
+      setSuccess('Contraseña actualizada');
       setPw('');
       setPw2('');
     } catch (e: any) {

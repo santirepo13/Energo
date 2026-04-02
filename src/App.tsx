@@ -50,7 +50,7 @@ function App() {
         const d = await getDashboard()
         if (mounted) {
           setAuthenticated(true)
-          setCurrentUser(d.current_user ?? null)
+          setCurrentUser(d.user ?? null)
         }
       } catch (e) {
         if (mounted) {
@@ -214,7 +214,7 @@ function App() {
 
   async function handleLogout() {
     try {
-      await api.post('/auth/logout')
+      await api.post('/api/auth/logout')
     } catch (e) {
       // ignore errors
     } finally {
