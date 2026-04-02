@@ -353,7 +353,7 @@ END$$
 DROP PROCEDURE IF EXISTS `sp_settings_upsert_cost_per_kwh`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_settings_upsert_cost_per_kwh` (IN `p_value` VARCHAR(255))   BEGIN
   INSERT INTO settings (`key`,`value`,`created_at`,`updated_at`)
-  VALUES ('cost_per_kwh', p_value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  VALUES ('kwh_price', p_value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   ON DUPLICATE KEY UPDATE
     `value` = VALUES(`value`),
     `updated_at` = CURRENT_TIMESTAMP;
