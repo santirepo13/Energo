@@ -9,7 +9,8 @@ export class UserRepository {
       'CALL sp_users_find_by_username_or_email(?, ?)',
       [username, email]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   async findById(id: number): Promise<User | null> {
@@ -17,7 +18,8 @@ export class UserRepository {
       'CALL sp_users_get_basic_by_id(?)',
       [id]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   async create(userData: any): Promise<number> {
@@ -49,7 +51,8 @@ export class UserRepository {
       'CALL sp_users_info_by_id(?)',
       [userId]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
@@ -57,7 +60,8 @@ export class UserRepository {
       'CALL sp_users_get_by_email(?)',
       [email]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
@@ -65,7 +69,8 @@ export class UserRepository {
       'CALL sp_users_get_by_username(?)',
       [username]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   async getUserPasswordHash(userId: number): Promise<string | null> {
@@ -107,7 +112,8 @@ export class UserRepository {
       'CALL sp_users_select_role_status_by_id(?)',
       [userId]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -127,14 +133,15 @@ export class UserRepository {
     // Get user's username first, then find security logs for that user
     const user = await this.getUserById(userId);
     if (!user) return [];
-    
+
     const [rows]: any = await this.db(
       'CALL sp_security_logs_latest(?)',
       [200]
     );
-    
-    // Filter logs by username if available
-    const allLogs = Array.isArray(rows) ? rows : [];
+
+    // Unwrap result set from CALL statement
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    const allLogs = Array.isArray(resultSet) ? resultSet : [];
     return allLogs.filter((log: any) => log.username === user.username);
   }
 
