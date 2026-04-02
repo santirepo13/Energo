@@ -33,8 +33,8 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import HistoryIcon from '@mui/icons-material/History';
 import SecurityIcon from '@mui/icons-material/Security';
-import type { DashboardResponse, AuditMetrics } from '../api/client';
-import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice } from '../api/client';
+import type { DashboardResponse, AuditMetrics, KwhPriceHistoryEntry } from '../api/client';
+import { getDashboard, recharge, auditGetMetrics, adminUpdateKwhPrice, auditGetKwhPriceHistory } from '../api/client';
 
 const currencyCOP = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -105,11 +105,14 @@ export default function Dashboard() {
   // Audit state
   const [auditMetrics, setAuditMetrics] = useState<AuditMetrics | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [kwhPriceHistory, setKwhPriceHistory] = useState<KwhPriceHistoryEntry[]>([]);
 
   async function loadAuditData() {
     try {
       const m = await auditGetMetrics(30);
       setAuditMetrics(m);
+      const h = await auditGetKwhPriceHistory();
+      setKwhPriceHistory(h.history);
     } catch (e: any) {
       setAuditError(e?.response?.data?.error || e?.message || 'Error al cargar métricas');
     }
@@ -249,6 +252,17 @@ export default function Dashboard() {
   function handleOpenKwhDialog() {
     setKwhDialogPrice(String(cost));
     setKwhDialogOpen(true);
+  }
+
+  // Find the kWh price that was active at the time of a recharge
+  function getHistoricalKwhPrice(rechargeDate: string): number {
+    if (kwhPriceHistory.length === 0) return cost;
+    const rechargeTime = new Date(rechargeDate).getTime();
+    // Find the latest price entry that was created before or at the time of recharge
+    const applicableEntry = kwhPriceHistory
+      .filter(entry => new Date(entry.created_at).getTime() <= rechargeTime)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+    return applicableEntry ? applicableEntry.price_cop : cost;
   }
 
   // Save kWh price (admin)
@@ -512,24 +526,27 @@ export default function Dashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(data?.recharge_history ?? []).map((r, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <code style={{ letterSpacing: 1 }}>{r.pin_code}</code>
-                    </TableCell>
-                    <TableCell>{cardNameMap[r.card_number] || r.card_number}</TableCell>
-                    {isAdmin && <TableCell align="right">{r.user_id ?? '—'}</TableCell>}
-                    {isAdmin && (
-                      <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {r.email ?? '—'}
+                {(data?.recharge_history ?? []).map((r, idx) => {
+                  const historicalPrice = isAdmin ? getHistoricalKwhPrice(r.created_at) : cost;
+                  return (
+                    <TableRow key={idx}>
+                      <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <code style={{ letterSpacing: 1 }}>{r.pin_code}</code>
                       </TableCell>
-                    )}
-                    <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
-                    <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
-                    <TableCell align="right">{formatCOPCost(cost)}</TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell>{cardNameMap[r.card_number] || r.card_number}</TableCell>
+                      {isAdmin && <TableCell align="right">{r.user_id ?? '—'}</TableCell>}
+                      {isAdmin && (
+                        <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {r.email ?? '—'}
+                        </TableCell>
+                      )}
+                      <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
+                      <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
+                      <TableCell align="right">{formatCOPCost(historicalPrice)}</TableCell>
+                    </TableRow>
+                  );
+                })}
                 {(!data || !data.recharge_history || data.recharge_history.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={isAdmin ? 8 : 6} align="center">
