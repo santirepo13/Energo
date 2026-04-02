@@ -54,6 +54,7 @@ export type DashboardResponse = {
     pin_code: string;
     amount: number;
     kwh: number;
+    kwh_price_at_time?: number | null;
     created_at: string;
     card_number: string;
   }>;
@@ -181,6 +182,7 @@ export type MeProfileResponse = {
     pin_code: string;
     amount: number;
     kwh: number;
+    kwh_price_at_time?: number | null;
     created_at: string;
     card_number: string;
   }>;

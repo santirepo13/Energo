@@ -538,7 +538,12 @@ export default function Dashboard() {
               </TableHead>
               <TableBody>
                 {(data?.recharge_history ?? []).map((r, idx) => {
-                  const historicalPrice = isAdmin ? getHistoricalKwhPrice(r.created_at) : cost;
+                  // Use the price locked at recharge time; fall back to computing it from stored amount/kwh
+                  const lockedKwh = Number(r.kwh);
+                  const lockedAmount = Number(r.amount);
+                  const lockedPrice = r.kwh_price_at_time != null
+                    ? Number(r.kwh_price_at_time)
+                    : (lockedKwh > 0 ? Math.round((lockedAmount / lockedKwh) * 100) / 100 : 0);
                   return (
                     <TableRow key={idx}>
                       <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
@@ -552,9 +557,9 @@ export default function Dashboard() {
                           {r.email ?? '—'}
                         </TableCell>
                       )}
-                      <TableCell align="right">{formatCOP(Number(r.amount))}</TableCell>
-                      <TableCell align="right">{Number(r.kwh).toFixed(2)}</TableCell>
-                      <TableCell align="right">{formatCOPCost(historicalPrice)}</TableCell>
+                      <TableCell align="right">{formatCOP(lockedAmount)}</TableCell>
+                      <TableCell align="right">{lockedKwh.toFixed(2)}</TableCell>
+                      <TableCell align="right">{formatCOPCost(Math.round(lockedPrice * 100) / 100)}</TableCell>
                     </TableRow>
                   );
                 })}

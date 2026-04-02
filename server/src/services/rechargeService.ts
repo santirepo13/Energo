@@ -70,6 +70,7 @@ export class RechargeService {
     // Calculate the missing value based on the provided one
     let calculatedAmount = amount;
     let calculatedKwh = kwh;
+    let usedKwhPrice = 0;
     
     if (amount !== undefined && kwh === undefined) {
       // Amount provided, calculate kWh
@@ -77,6 +78,7 @@ export class RechargeService {
       if (!Number.isFinite(kwhPrice) || kwhPrice <= 0) {
         throw new Error('Invalid KWh price: must be a valid positive number');
       }
+      usedKwhPrice = kwhPrice;
       calculatedKwh = Math.round((amount / kwhPrice) * 100) / 100;
     } else if (kwh !== undefined && amount === undefined) {
       // kWh provided, calculate amount
@@ -84,9 +86,13 @@ export class RechargeService {
       if (!Number.isFinite(kwhPrice) || kwhPrice <= 0) {
         throw new Error('Invalid KWh price: must be a valid positive number');
       }
+      usedKwhPrice = kwhPrice;
       calculatedAmount = Math.round((kwh * kwhPrice) * 100) / 100;
     } else if (amount === undefined && kwh === undefined) {
       throw new Error('Either amount or kwh must be provided');
+    } else {
+      // Both provided - derive price from values
+      usedKwhPrice = calculatedKwh > 0 ? Math.round((calculatedAmount / calculatedKwh) * 100) / 100 : 0;
     }
     
     // Validate calculated values are valid numbers immediately after calculation
@@ -130,7 +136,7 @@ export class RechargeService {
 
     const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
 
-    await this.db('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
+    await this.db('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh, usedKwhPrice]);
     
     return { pin, balance: actualBalance, kwh: actualKwh };
   }
