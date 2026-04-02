@@ -45,4 +45,9 @@ export class SecurityRepository {
     const [rows]: any = await this.db('CALL sp_security_logs_by_user(?)', [userId]);
     return Array.isArray(rows) ? rows : [];
   }
+
+  async getKwhPriceHistory(): Promise<any[]> {
+    const [rows]: any = await this.db('CALL sp_kwh_price_history_list()');
+    return Array.isArray(rows) ? rows : [];
+  }
 }

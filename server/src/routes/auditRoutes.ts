@@ -96,5 +96,15 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
+  // Get kWh price history (audithor only)
+  router.get('/kwh-price-history', requireAdmin, async (req, res) => {
+    try {
+      const history = await auditService.getKwhPriceHistory();
+      res.json({ history });
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load kWh price history' });
+    }
+  });
+
   return router;
 };

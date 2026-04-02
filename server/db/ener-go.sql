@@ -238,6 +238,19 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_kwh_price_history_insert` (IN `p
   INSERT INTO kwh_price_history (admin_user_id, price_cop) VALUES (p_admin_user_id, p_price);
 END$$
 
+DROP PROCEDURE IF EXISTS `sp_kwh_price_history_list`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_kwh_price_history_list` ()   BEGIN
+  SELECT
+    kph.id,
+    kph.admin_user_id,
+    u.username AS admin_username,
+    kph.price_cop,
+    kph.created_at
+  FROM kwh_price_history kph
+  LEFT JOIN users u ON u.id = kph.admin_user_id
+  ORDER BY kph.created_at DESC, kph.id DESC;
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_ping`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_ping` ()   BEGIN
   SELECT 1 AS ok;

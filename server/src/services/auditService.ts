@@ -42,4 +42,9 @@ export class AuditService {
     // Call the stored procedure to get security logs for a specific user
     return await this.securityRepository.getSecurityLogsByUser(userId);
   }
+
+  async getKwhPriceHistory(): Promise<any[]> {
+    // Call the stored procedure to get kWh price history
+    return await this.securityRepository.getKwhPriceHistory();
+  }
 }

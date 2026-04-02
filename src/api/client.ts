@@ -126,6 +126,14 @@ export type AuditMetrics = {
   }>;
 };
 
+export type KwhPriceHistoryEntry = {
+  id: number;
+  admin_user_id: number;
+  admin_username: string | null;
+  price_cop: number;
+  created_at: string;
+};
+
 // ==== Audit Employees (admin + audit) and Employee Codes API ====
 
 export type EmployeeCodeRow = {
@@ -359,6 +367,11 @@ export async function auditGenerateEmployeeCode(role: 'admin' | 'audit') {
 export async function auditGetMetrics(days = 30) {
   const res = await api.get(`/api/audit/metrics/series`, { params: { days } });
   return res.data as AuditMetrics;
+}
+
+export async function auditGetKwhPriceHistory() {
+  const res = await api.get(`/api/audit/kwh-price-history`);
+  return res.data as { history: KwhPriceHistoryEntry[] };
 }
 
 export async function adminUpdateKwhPrice(price: number) {
