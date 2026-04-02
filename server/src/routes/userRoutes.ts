@@ -25,7 +25,15 @@ export const createUserRoutes = (
       const cards = await energyCardService.getCardsByUser(userId);
       const rechargeHistory = await rechargeService.getRechargeHistory(userId);
       const kwhPrice = await rechargeService.getKwhPrice();
-      res.json({ user, profile, personal_data_filled: personalDataFilled, cards, recharge_history: rechargeHistory, kwh_price: kwhPrice });
+      res.json({
+        username: user?.username || '',
+        email: user?.email || '',
+        profile,
+        personal_data_filled: personalDataFilled,
+        cards,
+        recharge_history: rechargeHistory,
+        kwh_price: kwhPrice
+      });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load profile' });
     }
