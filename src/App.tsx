@@ -29,7 +29,8 @@ function App() {
   const location = useLocation()
   const onHome = location.pathname === '/'
   
-  const isAudit = currentUser?.role === 'audit'
+  const isAdmin = currentUser?.role === 'admin';
+  const isAudit = currentUser?.role === 'audit';
 
   const theme = useMemo(() => {
     return createTheme({
