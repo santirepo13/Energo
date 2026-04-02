@@ -67,4 +67,16 @@ export class EnergyCardRepository implements IEnergyCardRepository {
   async transferOwnership(cardId: number, newUserId: number): Promise<void> {
     await this.db('CALL sp_energy_cards_transfer_owner(?, ?)', [cardId, newUserId]);
   }
+
+  async linkCardToUser(userId: number, cardNumber: string, name?: string): Promise<void> {
+    // First we need to find the card to get its ID
+    const card = await this.findByCardNumber(cardNumber);
+    if (card) {
+      await this.transferOwnership(card.id, userId);
+    }
+  }
+
+  async removeUserCard(userId: number, cardNumber: string): Promise<void> {
+    await this.db('CALL sp_energy_cards_release_by_user_and_card(?, ?, ?)', [userId, cardNumber, null]);
+  }
 }

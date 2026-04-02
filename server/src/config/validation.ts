@@ -80,4 +80,13 @@ export const validationSchemas = {
   meterUpdate: Joi.object({
     name: Joi.string().optional(),
   }),
+  
+  emailUpdate: Joi.object({
+    email: Joi.string().email().required(),
+  }),
+  
+  linkMeter: Joi.object({
+    card_number: Joi.string().required(),
+    name: Joi.string().optional(),
+  }),
 };

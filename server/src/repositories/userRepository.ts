@@ -109,4 +109,48 @@ export class UserRepository {
     );
     return Array.isArray(rows) && rows.length ? rows[0] : null;
   }
+
+  async getAllUsers(): Promise<User[]> {
+    const [rows]: any = await this.db('CALL sp_admin_list_users()');
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async updateUserEmail(userId: number, email: string): Promise<void> {
+    await this.db('CALL sp_users_update_email(?, ?)', [userId, email]);
+  }
+
+  async updateStatusByName(userId: number, statusName: string): Promise<void> {
+    await this.db('CALL sp_users_update_status_by_name(?, ?)', [userId, statusName]);
+  }
+
+  async getUserLogs(userId: number): Promise<any[]> {
+    // Get user's username first, then find security logs for that user
+    const user = await this.getUserById(userId);
+    if (!user) return [];
+    
+    const [rows]: any = await this.db(
+      'CALL sp_security_logs_latest(?)',
+      [200]
+    );
+    
+    // Filter logs by username if available
+    const allLogs = Array.isArray(rows) ? rows : [];
+    return allLogs.filter((log: any) => log.username === user.username);
+  }
+
+  async generatePasswordResetToken(userId: number): Promise<string> {
+    // Generate a secure random token
+    const crypto = await import('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    
+    // Token expires in 1 hour
+    const expiresAt = new Date(Date.now() + 3600000);
+    
+    // Store the token in the database
+    await this.db('CALL sp_password_reset_token_insert(?, ?)', [userId, tokenHash]);
+    
+    return token;
+  }
+
 }

@@ -2,18 +2,18 @@ import { Request, Response, NextFunction } from 'express';
 import { logSecurityEvent } from '../config/security';
 import { Pool } from 'mysql2/promise';
 import { getClientIP } from '../config/security';
-import { getDatabaseFunction } from '../database/databasePool';
+import { getDatabaseFunction, DatabaseFunction } from '../database/databasePool';
 import { UserRepository } from '../repositories/userRepository';
 
 console.log('Cargando middleware de autenticación');
 
 export interface AuthMiddlewareOptions {
-  pool: Pool;
+  pool: Pool | DatabaseFunction;
 }
 
 export const createAuthMiddleware = ({ pool }: AuthMiddlewareOptions) => {
   // Create database function using the abstraction
-  const dbFunction = getDatabaseFunction();
+  const dbFunction = typeof pool === 'function' ? pool : getDatabaseFunction();
   const userRepository = new UserRepository(dbFunction);
   
   return {
