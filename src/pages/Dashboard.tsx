@@ -129,13 +129,16 @@ export default function Dashboard() {
         }
         if ((d?.user?.role ?? null) === 'audit') {
           await loadAuditData();
-        } else if (isAdmin) {
-          // Load kWh price history for admin users to show historical prices in movements
-          try {
-            const h = await auditGetKwhPriceHistory();
-            setKwhPriceHistory(h.history);
-          } catch (e) {
-            // Silently fail - admin can still see movements with current price as fallback
+        } else {
+          const adminRole = (d?.user?.role ?? '').toLowerCase();
+          if (adminRole === 'admin' || adminRole === 'administrator' || adminRole === 'administrador') {
+            // Load kWh price history for admin users to show historical prices in movements
+            try {
+              const h = await auditGetKwhPriceHistory();
+              setKwhPriceHistory(h.history);
+            } catch (e) {
+              // Silently fail - admin can still see movements with current price as fallback
+            }
           }
         }
       } catch (e: any) {
