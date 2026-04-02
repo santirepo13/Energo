@@ -13,9 +13,11 @@ import { createEnergyCardRoutes } from './routes/energyCardRoutes';
 import { createRechargeRoutes } from './routes/rechargeRoutes';
 import { createAdminRoutes } from './routes/adminRoutes';
 import { loadAppConfig } from './config/config';
+import { loadDatabaseConfig, createDatabasePool, normalizeConnectionCollation } from './config/database';
+import { initializeDatabase } from './database/databasePool';
 import { MySQLSessionStore } from './stores/sessionStore';
 
-console.log('Loading app');
+console.log('Cargando aplicación');
 
 export class App {
   private app: express.Application;
@@ -28,7 +30,11 @@ export class App {
 
   private async initializeMiddleware(): Promise<void> {
     const config = loadAppConfig();
+    const dbConfig = loadDatabaseConfig();
     
+    // Initialize database pool using the abstraction
+    initializeDatabase(dbConfig);
+
     // Build backend origin URL for CSP
     const backendOrigin = `http://${config.host}:${config.port}`;
 
@@ -58,7 +64,7 @@ export class App {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "http://192.168.2.24:5173", backendOrigin],
+      connectSrc: ["'self'", "http://100.76.213.9:5173", backendOrigin],
       imgSrc: ["'self'", "data:", "blob:"],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
@@ -67,7 +73,7 @@ export class App {
     },
   },
 }));
-;
+ ;
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
@@ -115,7 +121,7 @@ export class App {
     this.app.set('dbPool', dbPool);
 
     this.app.get('/health', (req, res) => {
-      res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+      res.json({ status: 'Working', timestamp: new Date().toISOString() });
     });
   }
 
@@ -126,12 +132,12 @@ export class App {
     const config = loadAppConfig();
     const port = config.port;
 
-    console.log('Starting server...');
-    console.log('Config:', config);
+    console.log('Iniciando servidor...');
+    console.log('Configuración:', config);
 
     this.app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on port ${port}`);
-    console.log('Available routes:');
+      console.log(`Servidor ejecutándose en el puerto ${port}`);
+    console.log('Rutas disponibles:');
     console.log('  GET /health');
     console.log('  POST /api/auth/login');
     console.log('  POST /api/auth/register');

@@ -1,4 +1,4 @@
-console.log('Loading energy card model');
+console.log('Cargando modelo de tarjeta de energía');
 
 export interface EnergyCard {
   id: number;

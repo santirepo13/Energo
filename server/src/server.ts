@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { App } from './app';
 
-console.log('Starting server');
+console.log('Iniciando servidor');
 
 const app = new App();
 
@@ -9,7 +9,7 @@ async function startServer() {
   try {
     await app.start();
   } catch (e) {
-    console.error('Failed to start server', e);
+    console.error('Falló al iniciar servidor', e);
     process.exit(1);
   }
 }

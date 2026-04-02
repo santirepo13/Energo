@@ -3,7 +3,6 @@ export interface AppConfig {
   host: string;
   clientOrigin: string | string[];
   sessionSecret: string;
-  defaultCostPerKwh: number;
   stsMasterKey: string;
   database: {
     host: string;
@@ -14,7 +13,7 @@ export interface AppConfig {
 }
 
 export const loadAppConfig = (): AppConfig => {
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173,http://192.168.2.24:5173,http://localhost:5173';
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://0.0.0.0:5173,http://192.168.2.24:5173,http://localhost:5173,100.76.213.9:5173';
   const origins = clientOrigin.split(',').map(s => s.trim()).filter(s => s);
   
   const config = {
@@ -22,7 +21,6 @@ export const loadAppConfig = (): AppConfig => {
     host: process.env.HOST || '0.0.0.0',
     clientOrigin: origins.length > 1 ? origins : origins[0],
     sessionSecret: process.env.SESSION_SECRET || 'insecure-dev-secret',
-    defaultCostPerKwh: 861.88,
     stsMasterKey: process.env.STS_MASTER_KEY || process.env.SESSION_SECRET || 'insecure-dev-sts-key',
     database: {
       host: process.env.DB_HOST || 'localhost',
@@ -32,6 +30,6 @@ export const loadAppConfig = (): AppConfig => {
     },
   };
   
-  console.log('Loading app config:', config);
+  console.log('Cargando configuración de la aplicación:', config);
   return config;
 };

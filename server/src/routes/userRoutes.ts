@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { UserService } from '../services/userService';
+import { AuthService } from '../services/authService';
 import { EnergyCardService } from '../services/energyCardService';
 import { RechargeService } from '../services/rechargeService';
 
@@ -9,6 +10,7 @@ console.log('Loading user routes');
 
 export const createUserRoutes = (
   userService: UserService,
+  authService: AuthService,
   authMiddleware: ReturnType<typeof createAuthMiddleware>,
   rechargeService: RechargeService
 ) => {
@@ -41,7 +43,7 @@ export const createUserRoutes = (
   router.post('/password-change', authMiddleware.requireAuth, createValidationMiddleware().validate('passwordChange'), async (req, res) => {
     try {
       const userId = (req.session as any).userId;
-      await userService.changePassword(userId, req.body.current_password, req.body.new_password);
+      await authService.changePassword(userId, req.body.current_password, req.body.new_password);
       res.json({ message: 'Password updated' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to change password' });

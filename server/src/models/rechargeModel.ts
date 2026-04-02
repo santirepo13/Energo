@@ -1,4 +1,4 @@
-console.log('Loading recharge model');
+console.log('Cargando modelo de recarga');
 
 export interface RechargePin {
   id: number;

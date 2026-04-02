@@ -40,18 +40,30 @@ export const normalizeConnectionCollation = (pool: mysql.Pool): void => {
 };
 
 export const loadDatabaseConfig = (): DatabaseConfig => {
-  const config = {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'ener-go',
-    port: Number(process.env.DB_PORT || 3306),
+  const host = process.env.DB_HOST;
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASSWORD;
+  const database = process.env.DB_NAME;
+  const portRaw = process.env.DB_PORT;
+
+  if (!host) throw new Error('Missing DB_HOST');
+  if (!user) throw new Error('Missing DB_USER');
+  if (!password) throw new Error('Missing DB_PASSWORD');
+  if (!database) throw new Error('Missing DB_NAME');
+  if (!portRaw) throw new Error('Missing DB_PORT');
+
+  const port = Number(portRaw);
+  if (Number.isNaN(port)) throw new Error('DB_PORT must be a valid number');
+
+  return {
+    host,
+    user,
+    password,
+    database,
+    port,
     charset: 'utf8mb4',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
   };
-  
-  console.log('Loading database config:', config);
-  return config;
 };

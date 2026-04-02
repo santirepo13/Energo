@@ -4,7 +4,7 @@ import { createValidationMiddleware } from '../middleware/validation';
 import { UserService } from '../services/userService';
 import { EnergyCardService } from '../services/energyCardService';
 
-console.log('Loading admin routes');
+console.log('Cargando rutas de administrador');
 
 export const createAdminRoutes = (userService: UserService, energyCardService: EnergyCardService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();

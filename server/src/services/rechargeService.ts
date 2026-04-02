@@ -1,18 +1,20 @@
-import { Pool } from 'mysql2/promise';
+import { DatabaseFunction } from '../database/databasePool';
 import { RechargePin, RechargeTransaction } from '../models/rechargeModel';
+import { RechargeRepository } from '../repositories/rechargeRepository';
 import * as crypto from 'crypto';
 
-console.log('Loading recharge service');
+console.log('Cargando servicio de recarga');
 
 export class RechargeService {
-  constructor(private pool: Pool) {}
+  private rechargeRepository: RechargeRepository;
+
+  constructor(private db: DatabaseFunction) {
+    this.rechargeRepository = new RechargeRepository(db);
+  }
 
   async recharge(userId: number, amount: number, kwh: number, cardNumber: string, pinCode?: string): Promise<{ pin: string; balance: number; kwh: number }> {
-  const conn = await this.pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    
-    const card = await this.getCardForRecharge(conn, userId, cardNumber);
+    // Since we're using the new abstraction, we don't need to manage connections manually
+    const card = await this.getCardForRecharge(userId, cardNumber);
     if (!card) {
       throw new Error('No energy card for user with that card_number');
     }
@@ -20,7 +22,7 @@ export class RechargeService {
     // Handle pin code recharge flow
     if (pinCode) {
       // For pin code recharges, use the provided balance and kwh values
-      const [pinResult]: any = await conn.query(
+      const [pinResult]: any = await this.db(
         'SELECT amount, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ?',
         [pinCode, userId]
       );
@@ -46,17 +48,10 @@ export class RechargeService {
         throw new Error('Invalid card balance or kwh values');
       }
       
-      const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
-      const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
-        ? updateResult[0][0].affected_rows 
-        : 0;
-      
-      if (affectedRows !== 1) {
-        throw new Error('Failed to update energy card balance: no rows affected');
-      }
+      await this.db('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
       
       // Fetch the actual updated balance from the database
-      const [updatedCardResult]: any = await conn.query(
+      const [updatedCardResult]: any = await this.db(
         'SELECT current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ?',
         [userId, cardNumber]
       );
@@ -68,7 +63,6 @@ export class RechargeService {
       const actualBalance = updatedCardResult[0].current_balance;
       const actualKwh = updatedCardResult[0].current_kwh;
       
-      await conn.commit();
       return { pin: pinCode, balance: actualBalance, kwh: actualKwh };
     }
     
@@ -79,14 +73,14 @@ export class RechargeService {
     
     if (amount !== undefined && kwh === undefined) {
       // Amount provided, calculate kWh
-      const kwhPrice = await this.getKwhPrice(conn);
+      const kwhPrice = await this.getKwhPrice();
       if (!Number.isFinite(kwhPrice) || kwhPrice <= 0) {
         throw new Error('Invalid KWh price: must be a valid positive number');
       }
       calculatedKwh = Math.round((amount / kwhPrice) * 100) / 100;
     } else if (kwh !== undefined && amount === undefined) {
       // kWh provided, calculate amount
-      const kwhPrice = await this.getKwhPrice(conn);
+      const kwhPrice = await this.getKwhPrice();
       if (!Number.isFinite(kwhPrice) || kwhPrice <= 0) {
         throw new Error('Invalid KWh price: must be a valid positive number');
       }
@@ -119,17 +113,10 @@ export class RechargeService {
       throw new Error('Invalid card balance or kwh values');
     }
     
-    const [updateResult]: any = await conn.query('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
-    const affectedRows = Array.isArray(updateResult) && updateResult[0] && typeof updateResult[0][0]?.affected_rows === 'number' 
-      ? updateResult[0][0].affected_rows 
-      : 0;
-    
-    if (affectedRows !== 1) {
-      throw new Error('Failed to update energy card balance: no rows affected');
-    }
+    await this.db('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
     
     // Fetch the actual updated balance from the database
-    const [updatedCardResult]: any = await conn.query(
+    const [updatedCardResult]: any = await this.db(
       'SELECT current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ?',
       [userId, cardNumber]
     );
@@ -143,45 +130,28 @@ export class RechargeService {
 
     const pin = this.generateSts20Token(card.card_number, calculatedAmount, calculatedKwh);
 
-    await conn.query('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
+    await this.db('CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)', [userId, cardNumber, pin, calculatedAmount, calculatedKwh]);
     
-    await conn.commit();
     return { pin, balance: actualBalance, kwh: actualKwh };
-  } catch (e) {
-    await conn.rollback();
-    throw e;
-  } finally {
-    conn.release();
   }
-}
 
   async getRechargeHistory(userId: number): Promise<RechargeTransaction[]> {
-    const conn = await this.pool.getConnection();
-    try {
-      const [rows]: any = await conn.query(
-        'CALL sp_recharge_pins_list_by_user(?)',
-        [userId]
-      );
-      const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
-      return Array.isArray(firstSet) ? firstSet : [];
-    } finally {
-      conn.release();
-    }
+    return await this.rechargeRepository.findByUserId(userId);
   }
 
-  private async getCardForRecharge(conn: any, userId: number, cardNumber: string): Promise<any> {
+  private async getCardForRecharge(userId: number, cardNumber: string): Promise<any> {
     try {
-      return await callFirst(conn, 'sp_energy_cards_select_by_user_and_card_for_update', [userId, cardNumber]);
+      return await callFirst(this.db, 'sp_energy_cards_select_by_user_and_card_for_update', [userId, cardNumber]);
     } catch (e: any) {
       if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
-        return await this.getCardForRechargeRaw(conn, userId, cardNumber);
+        return await this.getCardForRechargeRaw(userId, cardNumber);
       }
       throw e;
     }
   }
 
-  private async getCardForRechargeRaw(conn: any, userId: number, cardNumber: string): Promise<any> {
-    const [rows]: any = await conn.query(
+  private async getCardForRechargeRaw(userId: number, cardNumber: string): Promise<any> {
+    const [rows]: any = await this.db(
       'SELECT id, user_id, card_number, current_balance, current_kwh, last_recharge FROM energy_cards ' +
       'WHERE user_id = ? AND card_number = ? FOR UPDATE',
       [userId, cardNumber]
@@ -223,8 +193,8 @@ export class RechargeService {
     return Math.max(0, Math.floor(ms / 86400000));
   }
 
-  private async getKwhPrice(conn: any): Promise<number> {
-    const [rows]: any = await conn.query('CALL sp_settings_get(?)', ['cost_per_kwh']);
+  private async getKwhPrice(): Promise<number> {
+    const [rows]: any = await this.db('CALL sp_settings_get(?)', ['cost_per_kwh']);
     const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
     if (!Array.isArray(firstSet) || firstSet.length === 0) {
       throw new Error('KWh price not found in settings');
@@ -251,9 +221,8 @@ export class RechargeService {
   }
 }
 
-async function callFirst<T = any>(conn: any, proc: string, params: any[] = []): Promise<T | null> {
-  const sql = `CALL ${proc}(${params.map(() => '?').join(',')})`;
-  const [rows]: any = await conn.query(sql, params);
+async function callFirst<T = any>(db: DatabaseFunction, proc: string, params: any[] = []): Promise<T | null> {
+  const [rows]: any = await db(`CALL ${proc}(${params.map(() => '?').join(',')})`, params);
   const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
   return Array.isArray(firstSet) && firstSet.length ? firstSet[0] : null;
 }

@@ -1,4 +1,4 @@
-console.log('Loading types types');
+console.log('Cargando tipos');
 
 export interface DatabaseConfig {
   host: string;
@@ -17,7 +17,6 @@ export interface AppConfig {
   host: string;
   clientOrigin: string;
   sessionSecret: string;
-  defaultCostPerKwh: number;
   stsMasterKey: string;
 }
 

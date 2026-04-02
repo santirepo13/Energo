@@ -1,22 +1,17 @@
-import { Pool } from 'mysql2/promise';
+import { DatabaseFunction } from '../database/databasePool';
+import { SecurityRepository } from '../repositories/securityRepository';
 
-console.log('Loading security service');
+console.log('Cargando servicio de seguridad');
 
 export class SecurityService {
-  constructor(private pool: Pool) {}
+  private securityRepository: SecurityRepository;
+
+  constructor(private db: DatabaseFunction) {
+    this.securityRepository = new SecurityRepository(db);
+  }
 
   async logEvent(eventType: string, username: string | null, ip: string, details: any): Promise<void> {
-    try {
-      const conn = await this.pool.getConnection();
-      try {
-        const payload = typeof details === 'string' ? details : JSON.stringify(details);
-        await conn.query('CALL sp_security_logs_insert(?, ?, ?, ?)', [eventType, username, ip, payload]);
-      } finally {
-        conn.release();
-      }
-    } catch (e) {
-      console.error('Failed to log security event', e);
-    }
+    await this.securityRepository.logEvent(eventType, username, ip, details);
   }
 
   validatePasswordPolicy(password: string, username: string, email: string): string | null {
