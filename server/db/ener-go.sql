@@ -412,7 +412,8 @@ END$$
 
 DROP PROCEDURE IF EXISTS `sp_users_info_by_id`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_info_by_id` (IN `p_user_id` INT)   BEGIN
-  SELECT u.username, r.name AS role_name, s.name AS status_name
+  SELECT u.id, u.username, u.email, u.created_at, u.last_login,
+         r.name AS role, s.name AS status 
   FROM users u
   LEFT JOIN roles r ON r.id = u.role_id
   LEFT JOIN statuses s ON s.id = u.status_id
