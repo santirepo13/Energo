@@ -37,7 +37,16 @@ export class UserService {
   async updateProfile(userId: number, profileData: any): Promise<void> {
     // Since we're using the new abstraction, we don't need to manage connections manually
     await this.userProfileRepository.updateProfile(userId, profileData);
-    await this.userFlagRepository.setPersonalDataFlag(userId, profileData);
+
+    // Determine if required personal data fields are filled
+    // Required fields: primer_nombre, primer_apellido, tipo_identificacion, numero_identificacion
+    const hasRequiredFields =
+      profileData.primer_nombre && profileData.primer_nombre.trim().length > 0 &&
+      profileData.primer_apellido && profileData.primer_apellido.trim().length > 0 &&
+      profileData.tipo_identificacion && profileData.tipo_identificacion.trim().length > 0 &&
+      profileData.numero_identificacion && profileData.numero_identificacion.trim().length > 0;
+
+    await this.userFlagRepository.setPersonalDataFlag(userId, hasRequiredFields);
   }
 
   async updateStatus(userId: number, status: string): Promise<void> {
