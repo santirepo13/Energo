@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 .kilocode/system-prompt-code
 .kilocode/
+server/tsconfig.tsbuildinfo
