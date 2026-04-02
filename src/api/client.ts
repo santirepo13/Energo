@@ -32,7 +32,10 @@ export type UserInfo = {
 
 export type DashboardResponse = {
   current_user?: UserInfo;
-  // Back-compat: first card 
+  user?: UserInfo;
+  profile?: UserProfile | null;
+  personal_data_filled?: boolean;
+  // Back-compat: first card
   card: {
     card_number: string;
     name?: string | null;
