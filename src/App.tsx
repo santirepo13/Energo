@@ -31,6 +31,8 @@ function App() {
   
   const isAdmin = currentUser?.role === 'admin';
   const isAudit = currentUser?.role === 'audit';
+  // Profile prompt only applies to regular users, not admin or audit
+  const isRegularUser = !isAdmin && !isAudit;
 
   const theme = useMemo(() => {
     return createTheme({
@@ -77,7 +79,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (authenticated !== true) return
+    // Profile completion check only applies to regular users
+    if (authenticated !== true || !isRegularUser) return
     let mounted = true
     ;(async () => {
       try {
@@ -137,11 +140,11 @@ function App() {
       window.removeEventListener('storage', onStorage)
       try { (bc as any)?.close?.() } catch {}
     }
-  }, [authenticated, location.pathname, navigate])
+  }, [authenticated, isRegularUser, location.pathname, navigate])
 
   // Poll + focus/visibility re-check while esperando datos personales
   useEffect(() => {
-    if (authenticated !== true || !waitingForProfile) return
+    if (authenticated !== true || !waitingForProfile || !isRegularUser) return
     let cancelled = false
     const check = async () => {
       try {
@@ -165,11 +168,11 @@ function App() {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
     }
-  }, [authenticated, waitingForProfile, navigate])
+  }, [authenticated, waitingForProfile, isRegularUser, navigate])
 
   // Fallback: poll while waiting to detect when personal data is filled
   useEffect(() => {
-    if (authenticated !== true || !waitingForProfile) return
+    if (authenticated !== true || !waitingForProfile || !isRegularUser) return
     let cancelled = false
     const check = async () => {
       try {
@@ -186,7 +189,7 @@ function App() {
     const id = setInterval(check, 3000)
     check()
     return () => { cancelled = true; clearInterval(id) }
-  }, [authenticated, waitingForProfile, navigate, location.pathname])
+  }, [authenticated, waitingForProfile, isRegularUser, navigate, location.pathname])
 
   // When profileReady and this tab is visible, wait 2s then go to dashboard
   useEffect(() => {
@@ -320,7 +323,7 @@ function App() {
         </Typography>
       </Box>
 
-      {authenticated === true && !['/login', '/register', '/reset-password'].includes(location.pathname) && ((location.pathname.startsWith('/me') ? waitingForProfile : (showProfilePrompt || waitingForProfile))) && (
+      {isRegularUser && authenticated === true && !['/login', '/register', '/reset-password'].includes(location.pathname) && ((location.pathname.startsWith('/me') ? waitingForProfile : (showProfilePrompt || waitingForProfile))) && (
         <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center' }}>
           {showProfilePrompt && !location.pathname.startsWith('/me') && (
             <Paper elevation={4} sx={{ width: '70vw', height: '70vh', p: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
