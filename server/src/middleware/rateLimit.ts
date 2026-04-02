@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-console.log('Loading rate limit middleware');
+console.log('Cargando middleware de límite de tasa');
 
 export interface RateLimitOptions {
   windowMs: number;

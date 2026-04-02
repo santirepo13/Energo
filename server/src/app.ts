@@ -1,162 +1,139 @@
 import express from 'express';
-import session from 'express-session';
 import cors from 'cors';
-import helmet from 'helmet';
-import { DatabaseConnection } from './database/connection';
-import { createAuthMiddleware } from './middleware/auth';
-import { createValidationMiddleware } from './middleware/validation';
+import session from 'express-session';
+import { loadAppConfig } from './config/config';
+import { createSecurityMiddleware, getClientIP } from './config/security';
 import { createErrorHandlerMiddleware } from './middleware/errorHandler';
-import { createRateLimitMiddleware } from './middleware/rateLimit';
+import { createAuthMiddleware } from './middleware/auth';
 import { createAuthRoutes } from './routes/authRoutes';
 import { createUserRoutes } from './routes/userRoutes';
+import { createAdminRoutes } from './routes/adminRoutes';
+import { createAuditRoutes } from './routes/auditRoutes';
 import { createEnergyCardRoutes } from './routes/energyCardRoutes';
 import { createRechargeRoutes } from './routes/rechargeRoutes';
-import { createAdminRoutes } from './routes/adminRoutes';
-import { loadAppConfig } from './config/config';
+import { AuthService } from './services/authService';
+import { UserService } from './services/userService';
+import { AdminService } from './services/adminService';
+import { AuditService } from './services/auditService';
+import { EnergyCardService } from './services/energyCardService';
+import { RechargeService } from './services/rechargeService';
 import { MySQLSessionStore } from './stores/sessionStore';
-
-console.log('Loading app');
+import { initializeDatabase, getDatabaseFunction, closeDatabase } from './database/databasePool';
+import { loadDatabaseConfig } from './config/database';
 
 export class App {
   private app: express.Application;
-  private dbConnection: DatabaseConnection;
+  private port: number;
+  private host: string;
 
   constructor() {
     this.app = express();
-    this.dbConnection = new DatabaseConnection();
+    const config = loadAppConfig();
+    this.port = config.port;
+    this.host = config.host;
+
+    this.initializeServices();
+    this.setupMiddleware();
+    this.setupRoutes();
+    this.setupErrorHandling();
   }
 
-  private async initializeMiddleware(): Promise<void> {
+  private initializeServices(): void {
+    const dbConfig = loadDatabaseConfig();
+    initializeDatabase(dbConfig);
+    const db = getDatabaseFunction();
+
+    const authService = new AuthService(db);
+    const userService = new UserService(db);
+    const adminService = new AdminService(db);
+    const auditService = new AuditService(db);
+    const energyCardService = new EnergyCardService(db);
+    const rechargeService = new RechargeService(db);
+
+    const authMiddleware = createAuthMiddleware({ pool: db });
+
+    this.app.set('authService', authService);
+    this.app.set('userService', userService);
+    this.app.set('adminService', adminService);
+    this.app.set('auditService', auditService);
+    this.app.set('energyCardService', energyCardService);
+    this.app.set('rechargeService', rechargeService);
+    this.app.set('authMiddleware', authMiddleware);
+    this.app.set('db', db);
+  }
+
+  private setupMiddleware(): void {
     const config = loadAppConfig();
-    
-    // Build backend origin URL for CSP
-    const backendOrigin = `http://${config.host}:${config.port}`;
+    const securityMiddleware = createSecurityMiddleware({
+      clientOrigin: config.clientOrigin as string,
+      sessionSecret: config.sessionSecret,
+      corsCredentials: true,
+    });
 
-    // Apply CORS FIRST before any other middleware
-    this.app.use(cors({
-      origin: (origin, callback) => {
-        const allowedOrigins = Array.isArray(config.clientOrigin) 
-          ? config.clientOrigin 
-          : [config.clientOrigin];
-        
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
-      credentials: true,
-      optionsSuccessStatus: 200,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization']
-    }));
-
-    // Apply Helmet AFTER CORS
-    this.app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", "http://192.168.2.24:5173", backendOrigin],
-      imgSrc: ["'self'", "data:", "blob:"],
-      fontSrc: ["'self'", "data:"],
-      objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
-      workerSrc: ["'self'", "blob:"],
-    },
-  },
-}));
-;
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    const dbPool = this.dbConnection.getPool();
-    const sessionStore = new MySQLSessionStore(dbPool);
+    this.app.use(cors(securityMiddleware.cors()));
+    this.app.use(securityMiddleware.securityHeaders);
+    this.app.use(securityMiddleware.blockHiddenFiles);
 
-    this.app.use(session({
-      secret: config.sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      store: sessionStore,
-      cookie: {
-        secure: false, // false for development over HTTP
-        httpOnly: true,
-        sameSite: 'lax', // Allow cross-site cookies in development
-        maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
-      }
-    }));
-
-    const rateLimitMiddleware = createRateLimitMiddleware({windowMs: 15*60*1000, max: 100, message: 'Too many requests'});
-    this.app.use(rateLimitMiddleware.rateLimit);
+    const sessionStore = new MySQLSessionStore(getDatabaseFunction());
+    this.app.use(
+      session({
+        store: sessionStore,
+        secret: config.sessionSecret,
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          secure: process.env.NODE_ENV === 'production',
+          httpOnly: true,
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        },
+      })
+    );
   }
 
-  private initializeRoutes(): void {
-    const dbPool = this.dbConnection.getPool();
-    const authMiddleware = createAuthMiddleware({ pool: dbPool });
+  private setupRoutes(): void {
+    const authService = this.app.get('authService') as AuthService;
+    const userService = this.app.get('userService') as UserService;
+    const adminService = this.app.get('adminService') as AdminService;
+    const auditService = this.app.get('auditService') as AuditService;
+    const energyCardService = this.app.get('energyCardService') as EnergyCardService;
+    const rechargeService = this.app.get('rechargeService') as RechargeService;
+    const authMiddleware = this.app.get('authMiddleware') as ReturnType<typeof createAuthMiddleware>;
 
-    const { AuthService } = require('./services/authService');
-    const { UserService } = require('./services/userService');
-    const { EnergyCardService } = require('./services/energyCardService');
-    const { RechargeService } = require('./services/rechargeService');
-
-    const authRoutes = createAuthRoutes(new AuthService(dbPool), authMiddleware);
-    const userRoutes = createUserRoutes(new UserService(dbPool), authMiddleware, new RechargeService(dbPool));
-    const energyCardRoutes = createEnergyCardRoutes(new EnergyCardService(dbPool), authMiddleware);
-    const rechargeRoutes = createRechargeRoutes(new RechargeService(dbPool), authMiddleware);
-    const adminRoutes = createAdminRoutes(new UserService(dbPool), new EnergyCardService(dbPool), authMiddleware);
+    const authRoutes = createAuthRoutes(authService, authMiddleware);
+    const userRoutes = createUserRoutes(userService, authService, authMiddleware, rechargeService);
+    const adminRoutes = createAdminRoutes(userService, energyCardService, adminService, authMiddleware);
+    const auditRoutes = createAuditRoutes(auditService, authMiddleware);
+    const energyCardRoutes = createEnergyCardRoutes(energyCardService, authMiddleware);
+    const rechargeRoutes = createRechargeRoutes(rechargeService, authMiddleware);
 
     this.app.use('/api/auth', authRoutes);
-    this.app.use('/api/me', userRoutes);
-    this.app.use('/api/me/meters', energyCardRoutes);
-    this.app.use('/api/recharge', rechargeRoutes);
+    this.app.use('/api/user', userRoutes);
     this.app.use('/api/admin', adminRoutes);
-    
-    this.app.set('dbPool', dbPool);
+    this.app.use('/api/audit', auditRoutes);
+    this.app.use('/api/meters', energyCardRoutes);
+    this.app.use('/api/recharge', rechargeRoutes);
 
     this.app.get('/health', (req, res) => {
-      res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+      res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
   }
 
-  async start(): Promise<void> {
-    await this.initializeMiddleware();
-    this.initializeRoutes();
-    this.initializeErrorHandling();
-    const config = loadAppConfig();
-    const port = config.port;
+  private setupErrorHandling(): void {
+    const { errorHandler, notFoundHandler } = createErrorHandlerMiddleware();
+    this.app.use(notFoundHandler);
+    this.app.use(errorHandler);
+  }
 
-    console.log('Starting server...');
-    console.log('Config:', config);
-
-    this.app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on port ${port}`);
-    console.log('Available routes:');
-    console.log('  GET /health');
-    console.log('  POST /api/auth/login');
-    console.log('  POST /api/auth/register');
-    console.log('  POST /api/auth/logout');
-    console.log('  GET /api/me/profile');
-    console.log('  PUT /api/me/profile');
-    console.log('  POST /api/me/password-change');
-    console.log('  POST /api/me/status');
-    console.log('  GET /api/me/meters');
-    console.log('  POST /api/me/meters');
-    console.log('  DELETE /api/me/meters/:card_number');
-    console.log('  PATCH /api/me/meters/:card_number');
-    console.log('  POST /api/recharge');
-    console.log('  GET /api/recharge/history');
-    console.log('  POST /api/admin/kwh-price');
+  public async start(): Promise<void> {
+    this.app.listen(this.port, this.host, () => {
+      console.log(`Server running on http://${this.host}:${this.port}`);
     });
   }
 
-  async stop(): Promise<void> {
-    await this.dbConnection.close();
-  }
-
-  private initializeErrorHandling(): void {
-    const errorHandlerMiddleware = createErrorHandlerMiddleware();
-    this.app.use(errorHandlerMiddleware.errorHandler);
-    this.app.use(errorHandlerMiddleware.notFoundHandler);
+  public async stop(): Promise<void> {
+    await closeDatabase();
   }
 }

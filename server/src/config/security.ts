@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { getDatabaseFunction } from '../database/databasePool';
 
 export interface SecurityConfig {
   clientOrigin: string;
@@ -40,14 +41,12 @@ export const getClientIP = (req: Request): string => {
 };
 
 export const logSecurityEvent = async (pool: any, eventType: string, username: string | null, ip: string, details: any) => {
+  // Create database function using the abstraction
+  const dbFunction = getDatabaseFunction();
+  
   try {
-    const conn = await pool.getConnection();
-    try {
-      const payload = typeof details === 'string' ? details : JSON.stringify(details);
-      await conn.query('CALL sp_security_logs_insert(?, ?, ?, ?)', [eventType, username, ip, payload]);
-    } finally {
-      conn.release();
-    }
+    const payload = typeof details === 'string' ? details : JSON.stringify(details);
+    await dbFunction('CALL sp_security_logs_insert(?, ?, ?, ?)', [eventType, username, ip, payload]);
   } catch (e) {
     console.error('Failed to log security event', e);
   }

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-console.log('Loading authorization middleware');
+console.log('Cargando middleware de autorización');
 
 export interface AuthorizationMiddlewareOptions {
   allowedRoles: string[];
@@ -12,15 +12,15 @@ export const createAuthorizationMiddleware = ({ allowedRoles, allowedStatuses }:
     authorize: (req: Request, res: Response, next: NextFunction) => {
       const user = (req as any).user;
       if (!user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        return res.status(401).json({ error: 'No autorizado' });
       }
       
       if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({ error: 'Insufficient permissions' });
+        return res.status(403).json({ error: 'Permisos insuficientes' });
       }
       
       if (allowedStatuses && !allowedStatuses.includes(user.status)) {
-        return res.status(403).json({ error: `Status ${user.status} not allowed for this operation` });
+        return res.status(403).json({ error: `Estado ${user.status} no permitido para esta operación` });
       }
       
       next();

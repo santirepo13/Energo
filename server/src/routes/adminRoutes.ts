@@ -3,10 +3,11 @@ import { createAuthMiddleware } from '../middleware/auth';
 import { createValidationMiddleware } from '../middleware/validation';
 import { UserService } from '../services/userService';
 import { EnergyCardService } from '../services/energyCardService';
+import { AdminService } from '../services/adminService';
 
-console.log('Loading admin routes');
+console.log('Cargando rutas de administrador');
 
-export const createAdminRoutes = (userService: UserService, energyCardService: EnergyCardService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
+export const createAdminRoutes = (userService: UserService, energyCardService: EnergyCardService, adminService: AdminService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();
 
   // Admin-only middleware
@@ -15,7 +16,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   // Get all users (admin only)
   router.get('/users', requireAdmin, async (req, res) => {
     try {
-      const users = await userService.getAllUsers();
+      const users = await adminService.getAllUsers();
       res.json({ users });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load users' });
@@ -27,7 +28,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
     try {
       const { id } = req.params;
       const { email } = req.body;
-      await userService.updateUserEmail(Number(id), email);
+      await adminService.updateUserEmail(Number(id), email);
       res.json({ message: 'Email updated' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to update email' });
@@ -39,7 +40,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
     try {
       const { id } = req.params;
       const { status } = req.body;
-      await userService.updateUserStatus(Number(id), status);
+      await adminService.updateUserStatus(Number(id), status);
       res.json({ message: 'Status updated' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to update status' });
@@ -50,8 +51,8 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   router.post('/users/:id/send-reset', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const link = await userService.sendPasswordResetLink(Number(id));
-      res.json({ message: 'Reset link sent', link });
+      await adminService.sendPasswordResetLink(Number(id));
+      res.json({ message: 'Reset link sent' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to send reset link' });
     }
@@ -61,7 +62,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   router.get('/users/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const userDetail = await userService.getUserDetail(Number(id));
+      const userDetail = await adminService.getUserDetail(Number(id));
       res.json({ user: userDetail });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load user detail' });
@@ -72,7 +73,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   router.get('/users/:id/logs', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const logs = await userService.getUserLogs(Number(id));
+      const logs = await adminService.getUserLogs(Number(id));
       res.json({ logs });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load user logs' });
@@ -84,7 +85,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
     try {
       const { id } = req.params;
       const { card_number } = req.body;
-      await energyCardService.linkCardToUser(Number(id), card_number);
+      await adminService.linkCardToUser(Number(id), card_number);
       res.json({ message: 'Meter linked' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to link meter' });
@@ -95,7 +96,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   router.delete('/users/:id/:card_number', requireAdmin, async (req, res) => {
     try {
       const { id, card_number } = req.params;
-      await energyCardService.removeUserCard(Number(id), card_number);
+      await adminService.removeUserCard(Number(id), card_number);
       res.json({ message: 'Meter removed' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to remove meter' });
@@ -106,7 +107,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   router.post('/users/:id/suspend', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      await userService.suspendUser(Number(id));
+      await adminService.suspendUser(Number(id));
       res.json({ message: 'User suspended' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to suspend user' });
@@ -117,7 +118,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   router.post('/users/:id/unsuspend', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      await userService.unsuspendUser(Number(id));
+      await adminService.unsuspendUser(Number(id));
       res.json({ message: 'User unsuspended' });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to unsuspend user' });
@@ -139,4 +140,4 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   });
 
   return router;
-};
+}

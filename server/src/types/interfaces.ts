@@ -1,4 +1,4 @@
-console.log('Loading types interfaces');
+console.log('Cargando interfaces de tipos');
 
 export interface User {
   id: number;

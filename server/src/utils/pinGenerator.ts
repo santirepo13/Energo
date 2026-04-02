@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-console.log('Loading pin generator utility');
+console.log('Cargando utilidad de generador de pin');
 
 export class PinGenerator {
   private readonly STS_BASE_DATE = new Date(Date.UTC(1993, 0, 1));
