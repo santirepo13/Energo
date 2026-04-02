@@ -139,6 +139,10 @@ export class RechargeService {
     return await this.rechargeRepository.findByUserId(userId);
   }
 
+  async getAllRechargeHistory(): Promise<RechargeTransaction[]> {
+    return await this.rechargeRepository.findAll();
+  }
+
   private async getCardForRecharge(userId: number, cardNumber: string): Promise<any> {
     try {
       return await callFirst(this.db, 'sp_energy_cards_select_by_user_and_card_for_update', [userId, cardNumber]);

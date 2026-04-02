@@ -29,6 +29,14 @@ export class RechargeRepository {
     return Array.isArray(resultSet) ? resultSet : [];
   }
 
+  async findAll(): Promise<RechargeTransaction[]> {
+    const [rows]: any = await this.db(
+      'CALL sp_recharge_pins_list_all()'
+    );
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
+  }
+
   async findByUserIdAndCardNumber(userId: number, cardNumber: string): Promise<RechargeTransaction[]> {
     const [rows]: any = await this.db(
       'CALL sp_recharge_pins_list_by_user_and_card(?, ?)',

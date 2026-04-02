@@ -314,8 +314,6 @@ export default function Dashboard() {
             >
               <Chip
                 color="success"
-                clickable
-                component="button"
                 label={`Costo: ${formatCOPCost(cost)} por kWh`}
                 icon={<BoltIcon />}
                 sx={{ pointerEvents: 'none' }}

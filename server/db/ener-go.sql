@@ -285,6 +285,14 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_by_user_and_c
   ORDER BY rp.created_at DESC;
 END$$
 
+DROP PROCEDURE IF EXISTS `sp_recharge_pins_list_all`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_all` ()   BEGIN
+  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number
+  FROM recharge_pins rp
+  LEFT JOIN users u ON u.id = rp.user_id
+  ORDER BY rp.created_at DESC;
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_roles_get_id_by_name`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_roles_get_id_by_name` (IN `p_name` VARCHAR(50))   BEGIN
   SELECT id FROM roles WHERE name = CONVERT(p_name USING utf8mb4) COLLATE utf8mb4_general_ci LIMIT 1;
