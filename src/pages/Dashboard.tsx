@@ -75,9 +75,9 @@ export default function Dashboard() {
   const [kwhDialogError, setKwhDialogError] = useState<string | null>(null);
 
   const cost = data?.kwh_price ?? 861.88;
-  const userStatus = data?.current_user?.status ?? null;
+  const userStatus = data?.user?.status ?? null;
   const isPaused = userStatus === 'Pausa';
-  const role = (data?.current_user?.role ?? null) as string | null;
+  const role = (data?.user?.role ?? null) as string | null;
   const normRole = role ? role.toLowerCase() : null;
   // Be tolerant to DB/localization differences (e.g., 'Administrador', 'Administrator')
   const isAdmin = normRole === 'admin' || normRole === 'administrator' || normRole === 'administrador';
@@ -124,7 +124,7 @@ export default function Dashboard() {
         if (mounted) {
           setData(d);
         }
-        if ((d?.current_user?.role ?? null) === 'audit') {
+        if ((d?.user?.role ?? null) === 'audit') {
           await loadAuditData();
         }
       } catch (e: any) {
