@@ -193,7 +193,7 @@ export class RechargeService {
     return Math.max(0, Math.floor(ms / 86400000));
   }
 
-  private async getKwhPrice(): Promise<number> {
+  async getKwhPrice(): Promise<number> {
     const [rows]: any = await this.db('CALL sp_settings_get(?)', ['cost_per_kwh']);
     const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
     if (!Array.isArray(firstSet) || firstSet.length === 0) {

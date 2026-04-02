@@ -29,7 +29,8 @@ export class EnergyCardRepository implements IEnergyCardRepository {
       'CALL sp_energy_cards_list_by_user(?)',
       [userId]
     );
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async findByUserIdAndCardNumber(userId: number, cardNumber: string): Promise<EnergyCard | null> {
