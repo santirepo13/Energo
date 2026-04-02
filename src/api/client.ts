@@ -157,8 +157,10 @@ export type UserProfile = {
 
 // Respuesta de GET /me/profile
 export type MeProfileResponse = {
-  username: string;
-  email: string;           // correo de registro (solo lectura en UI)
+  user: {
+    username: string;
+    email: string;           // correo de registro (solo lectura en UI)
+  };
   profile: UserProfile | null;
   personal_data_filled?: boolean; // bandera desde BD: 1 cuando ya llenó dirección y teléfono al menos una vez
   cards?: Array<{

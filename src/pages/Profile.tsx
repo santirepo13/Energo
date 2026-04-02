@@ -76,7 +76,7 @@ export default function ProfilePage() {
       try {
         const res: MeProfileResponse = await meGetProfile();
         if (!mounted) return;
-        setEmail(res.email ?? '');
+        setEmail(res.user?.email ?? '');
         const p = res.profile;
         if (p) {
           setForm({
