@@ -82,7 +82,7 @@ function App() {
       try {
         const pr = await meGetProfile()
         if (!mounted) return
-        const filled = pr.personal_data_filled === true
+        const filled = !!pr.personal_data_filled
         if (!filled && !location.pathname.startsWith('/me')) setShowProfilePrompt(true)
       } catch {}
     })()
