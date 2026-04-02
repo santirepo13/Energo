@@ -198,7 +198,7 @@ export class RechargeService {
   }
 
   async getKwhPrice(): Promise<number> {
-    const [rows]: any = await this.db('CALL sp_settings_get(?)', ['cost_per_kwh']);
+    const [rows]: any = await this.db('CALL sp_settings_get(?)', ['kwh_price']);
     const firstSet: any = Array.isArray(rows) ? rows[0] : rows;
     if (!Array.isArray(firstSet) || firstSet.length === 0) {
       throw new Error('KWh price not found in settings');
