@@ -13,14 +13,8 @@ import {
   TextField,
   Tooltip,
   Typography,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
 } from '@mui/material';
-import HistoryIcon from '@mui/icons-material/History';
-import { meGetProfile, meUpdateProfile, type MeProfileResponse, type UpdateProfileRequest } from '../api/client';
+import { meGetProfile, meUpdateProfile, type UpdateProfileRequest } from '../api/client';
 
 const DOC_TYPES = ['CC','CE','Pasaporte','PEP','RIF'] as const;
 
