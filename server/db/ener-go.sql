@@ -249,6 +249,12 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_insert` (IN `p_use
   VALUES (p_user_id, p_card_number, p_pin_code, p_amount, p_kwh);
 END$$
 
+DROP PROCEDURE IF EXISTS `sp_recharge_transactions_insert`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_transactions_insert` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50), IN `p_amount` DECIMAL(10,2), IN `p_kwh` DECIMAL(10,2))   BEGIN
+  INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh)
+  VALUES (p_user_id, p_card_number, CONCAT('TXN_', DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')), p_amount, p_kwh);
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_recharge_pins_latest`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_latest` (IN `p_limit` INT)   BEGIN
   IF p_limit IS NULL OR p_limit <= 0 THEN SET p_limit = 100;
@@ -266,6 +272,16 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_by_user` (IN 
   FROM recharge_pins rp
   LEFT JOIN users u ON u.id = rp.user_id
   WHERE rp.user_id = p_user_id
+  ORDER BY rp.created_at DESC;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_recharge_pins_list_by_user_and_card`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_by_user_and_card` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50))   BEGIN
+  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number
+  FROM recharge_pins rp
+  LEFT JOIN users u ON u.id = rp.user_id
+  WHERE rp.user_id = p_user_id
+    AND rp.card_number = CONVERT(p_card_number USING utf8mb4) COLLATE utf8mb4_general_ci
   ORDER BY rp.created_at DESC;
 END$$
 
@@ -288,6 +304,24 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_security_logs_latest` (IN `p_lim
   FROM security_logs
   ORDER BY event_time DESC
   LIMIT p_limit;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_security_logs_get_by_id`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_security_logs_get_by_id` (IN `p_id` INT)   BEGIN
+  SELECT id, event_type, username, event_time, ip_address, details
+  FROM security_logs
+  WHERE id = p_id
+  LIMIT 1;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_security_logs_by_user`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_security_logs_by_user` (IN `p_user_id` INT)   BEGIN
+  SELECT sl.id, sl.event_type, sl.username, sl.event_time, sl.ip_address, sl.details
+  FROM security_logs sl
+  JOIN users u ON u.username = sl.username
+  WHERE u.id = p_user_id
+  ORDER BY sl.event_time DESC
+  LIMIT 200;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_settings_get`$$
@@ -352,6 +386,22 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_get_password_hash` (IN `p_
   SELECT username, email, password_hash FROM users WHERE id = p_user_id LIMIT 1;
 END$$
 
+DROP PROCEDURE IF EXISTS `sp_users_get_by_email`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_get_by_email` (IN `p_email` VARCHAR(100))   BEGIN
+  SELECT id, username, email, password_hash, role_id, status_id, created_at, last_login
+  FROM users
+  WHERE email = CONVERT(p_email USING utf8mb4) COLLATE utf8mb4_general_ci
+  LIMIT 1;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_users_get_by_username`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_get_by_username` (IN `p_username` VARCHAR(50))   BEGIN
+  SELECT id, username, email, password_hash, role_id, status_id, created_at, last_login
+  FROM users
+  WHERE username = CONVERT(p_username USING utf8mb4) COLLATE utf8mb4_general_ci
+  LIMIT 1;
+END$$
+
 DROP PROCEDURE IF EXISTS `sp_users_info_by_id`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_info_by_id` (IN `p_user_id` INT)   BEGIN
   SELECT u.username, r.name AS role_name, s.name AS status_name
@@ -410,6 +460,39 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_update_status_by_name` (IN
   IF v_status_id IS NOT NULL THEN
     UPDATE users SET status_id = v_status_id WHERE id = p_user_id;
   END IF;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_password_reset_token_insert`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_password_reset_token_insert` (IN `p_user_id` INT, IN `p_token_hash` CHAR(64))   BEGIN
+  DECLARE v_expires_at TIMESTAMP;
+  SET v_expires_at = DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 1 HOUR);
+  
+  -- Invalidate any existing tokens for this user
+  UPDATE password_resets SET used_at = CURRENT_TIMESTAMP WHERE user_id = p_user_id AND used_at IS NULL;
+  
+  -- Insert new token
+  INSERT INTO password_resets (user_id, token_hash, expires_at)
+  VALUES (p_user_id, p_token_hash, v_expires_at);
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_user_flags_get_personal_data_filled`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_user_flags_get_personal_data_filled` (IN `p_user_id` INT)   BEGIN
+  SELECT personal_data_filled, filled_at FROM user_flags WHERE user_id = p_user_id LIMIT 1;
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_user_flags_set_personal_data_filled`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_user_flags_set_personal_data_filled` (IN `p_user_id` INT, IN `p_filled` TINYINT)   BEGIN
+  INSERT INTO user_flags (user_id, personal_data_filled, filled_at)
+  VALUES (p_user_id, p_filled, IF(p_filled = 1, CURRENT_TIMESTAMP, NULL))
+  ON DUPLICATE KEY UPDATE
+    personal_data_filled = p_filled,
+    filled_at = IF(p_filled = 1, CURRENT_TIMESTAMP, filled_at);
+END$$
+
+DROP PROCEDURE IF EXISTS `sp_user_document_changes_insert`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_user_document_changes_insert` (IN `p_user_id` INT, IN `p_old_tipo` VARCHAR(32), IN `p_old_numero` VARCHAR(64), IN `p_new_tipo` VARCHAR(32), IN `p_new_numero` VARCHAR(64))   BEGIN
+  INSERT INTO user_document_changes (user_id, old_tipo, old_numero, new_tipo, new_numero)
+  VALUES (p_user_id, p_old_tipo, p_old_numero, p_new_tipo, p_new_numero);
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_user_profiles_get_by_user`$$

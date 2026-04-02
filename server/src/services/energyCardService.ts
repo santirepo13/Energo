@@ -56,4 +56,26 @@ export class EnergyCardService {
   async releaseCard(userId: number, cardNumber: string): Promise<void> {
     await this.energyCardRepository.release(userId, cardNumber, userId);
   }
+
+  async linkCardToUser(userId: number, cardNumber: string): Promise<void> {
+    // Find the card first
+    const card = await this.energyCardRepository.findByCardNumber(cardNumber);
+    if (!card) {
+      throw new Error('Card not found');
+    }
+    
+    // Transfer ownership using the repository method
+    await this.energyCardRepository.transferOwnership(card.id, userId);
+  }
+
+  async removeUserCard(userId: number, cardNumber: string): Promise<void> {
+    // Find the card first
+    const card = await this.energyCardRepository.findByCardNumber(cardNumber);
+    if (!card) {
+      throw new Error('Card not found');
+    }
+    
+    // Release the card using the repository method
+    await this.energyCardRepository.release(userId, cardNumber, userId);
+  }
 }
