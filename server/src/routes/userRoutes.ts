@@ -5,6 +5,7 @@ import { UserService } from '../services/userService';
 import { AuthService } from '../services/authService';
 import { EnergyCardService } from '../services/energyCardService';
 import { RechargeService } from '../services/rechargeService';
+import { UserRepository } from '../repositories/userRepository';
 
 console.log('Loading user routes');
 
@@ -22,10 +23,17 @@ export const createUserRoutes = (
       const { user, profile, personalDataFilled } = await userService.getProfile(userId);
       const dbPool = (req.app.get('db') as any);
       const energyCardService = new EnergyCardService(dbPool);
+      const userRepository = new UserRepository(dbPool);
       const cards = await energyCardService.getCardsByUser(userId);
       const rechargeHistory = await rechargeService.getRechargeHistory(userId);
       const kwhPrice = await rechargeService.getKwhPrice();
+      const roleStatus = await userRepository.getUserRoleStatusById(userId);
       res.json({
+        user: {
+          username: user?.username || '',
+          role: roleStatus?.role_name ?? null,
+          status: roleStatus?.status_name ?? null,
+        },
         username: user?.username || '',
         email: user?.email || '',
         profile,
