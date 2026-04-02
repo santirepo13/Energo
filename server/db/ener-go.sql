@@ -257,22 +257,22 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_ping` ()   BEGIN
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_recharge_pins_insert`$$
-CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_insert` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50), IN `p_pin_code` VARCHAR(20), IN `p_amount` DECIMAL(10,2), IN `p_kwh` DECIMAL(10,2))   BEGIN
-  INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh)
-  VALUES (p_user_id, p_card_number, p_pin_code, p_amount, p_kwh);
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_insert` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50), IN `p_pin_code` VARCHAR(20), IN `p_amount` DECIMAL(10,2), IN `p_kwh` DECIMAL(10,2), IN `p_kwh_price_at_time` DECIMAL(10,2))   BEGIN
+  INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh, kwh_price_at_time)
+  VALUES (p_user_id, p_card_number, p_pin_code, p_amount, p_kwh, p_kwh_price_at_time);
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_recharge_transactions_insert`$$
-CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_transactions_insert` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50), IN `p_amount` DECIMAL(10,2), IN `p_kwh` DECIMAL(10,2))   BEGIN
-  INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh)
-  VALUES (p_user_id, p_card_number, CONCAT('TXN_', DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')), p_amount, p_kwh);
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_transactions_insert` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50), IN `p_amount` DECIMAL(10,2), IN `p_kwh` DECIMAL(10,2), IN `p_kwh_price_at_time` DECIMAL(10,2))   BEGIN
+  INSERT INTO recharge_pins (user_id, card_number, pin_code, amount, kwh, kwh_price_at_time)
+  VALUES (p_user_id, p_card_number, CONCAT('TXN_', DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')), p_amount, p_kwh, p_kwh_price_at_time);
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_recharge_pins_latest`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_latest` (IN `p_limit` INT)   BEGIN
   IF p_limit IS NULL OR p_limit <= 0 THEN SET p_limit = 100;
   END IF;
-  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number
+  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.kwh_price_at_time, rp.created_at, rp.card_number
   FROM recharge_pins rp
   LEFT JOIN users u ON u.id = rp.user_id
   ORDER BY rp.created_at DESC
@@ -281,7 +281,7 @@ END$$
 
 DROP PROCEDURE IF EXISTS `sp_recharge_pins_list_by_user`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_by_user` (IN `p_user_id` INT)   BEGIN
-  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number
+  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.kwh_price_at_time, rp.created_at, rp.card_number
   FROM recharge_pins rp
   LEFT JOIN users u ON u.id = rp.user_id
   WHERE rp.user_id = p_user_id
@@ -290,7 +290,7 @@ END$$
 
 DROP PROCEDURE IF EXISTS `sp_recharge_pins_list_by_user_and_card`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_by_user_and_card` (IN `p_user_id` INT, IN `p_card_number` VARCHAR(50))   BEGIN
-  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number
+  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.kwh_price_at_time, rp.created_at, rp.card_number
   FROM recharge_pins rp
   LEFT JOIN users u ON u.id = rp.user_id
   WHERE rp.user_id = p_user_id
@@ -300,7 +300,7 @@ END$$
 
 DROP PROCEDURE IF EXISTS `sp_recharge_pins_list_all`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_recharge_pins_list_all` ()   BEGIN
-  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.created_at, rp.card_number
+  SELECT rp.user_id, u.email, rp.pin_code, rp.amount, rp.kwh, rp.kwh_price_at_time, rp.created_at, rp.card_number
   FROM recharge_pins rp
   LEFT JOIN users u ON u.id = rp.user_id
   ORDER BY rp.created_at DESC;
@@ -754,6 +754,7 @@ CREATE TABLE IF NOT EXISTS `recharge_pins` (
   `pin_code` varchar(20) COLLATE utf8mb4_general_ci NOT NULL,
   `amount` decimal(10,2) NOT NULL,
   `kwh` decimal(10,2) NOT NULL,
+  `kwh_price_at_time` decimal(10,2) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
