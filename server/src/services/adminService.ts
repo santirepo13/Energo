@@ -3,6 +3,23 @@ import { User } from '../models/userModel';
 import { UserRepository } from '../repositories/userRepository';
 import { EnergyCardRepository } from '../repositories/energyCardRepository';
 
+export type AdminUserDetail = {
+  id: number;
+  username: string;
+  email: string;
+  created_at: string;
+  last_login: string | null;
+  role: string | null;
+  status: string | null;
+  meters: Array<{
+    card_number: string;
+    name: string | null;
+    current_balance: number;
+    current_kwh: number;
+    last_recharge: string | null;
+  }>;
+};
+
 export class AdminService {
   private userRepository: UserRepository;
   private energyCardRepository: EnergyCardRepository;
@@ -17,9 +34,30 @@ export class AdminService {
     return await this.userRepository.getAllUsers();
   }
 
-  async getUserDetail(userId: number): Promise<User | null> {
-    // Use the repository method that calls the stored procedure
-    return await this.userRepository.getUserById(userId);
+  async getUserDetail(userId: number): Promise<AdminUserDetail | null> {
+    // Get user basic info from the stored procedure
+    const user = await this.userRepository.getUserById(userId);
+    if (!user) return null;
+
+    // Get meters for this user
+    const meters = await this.energyCardRepository.findByUserId(userId);
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      created_at: user.created_at,
+      last_login: user.last_login,
+      role: user.role,
+      status: user.status,
+      meters: meters.map(m => ({
+        card_number: m.card_number,
+        name: m.name,
+        current_balance: m.current_balance,
+        current_kwh: m.current_kwh,
+        last_recharge: m.last_recharge,
+      })),
+    };
   }
 
   async getUserLogs(userId: number): Promise<any[]> {
