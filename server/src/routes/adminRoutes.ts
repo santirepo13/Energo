@@ -11,7 +11,7 @@ export const createAdminRoutes = (userService: UserService, energyCardService: E
   const router = Router();
 
   // Admin-only middleware
-  const requireAdmin = authMiddleware.requireAuth;
+  const requireAdmin = authMiddleware.requireAdmin;
   
   // Get all users (admin only)
   router.get('/users', requireAdmin, async (req, res) => {
