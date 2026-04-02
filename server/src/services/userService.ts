@@ -27,10 +27,21 @@ export class UserService {
     if (!user) {
       throw new Error('Usuario no encontrado');
     }
-    
+
     const profile = await this.userProfileRepository.getProfile(userId);
-    const personalDataFilled = await this.userFlagRepository.getPersonalDataFlag(userId);
-    
+
+    // Check if profile has required fields using repository method
+    const hasRequiredFields = this.userProfileRepository.hasRequiredFields(profile);
+
+    // Get current flag value
+    let personalDataFilled = await this.userFlagRepository.getPersonalDataFlag(userId);
+
+    // Sync flag with actual profile state for existing users who filled profiles before user_flags table existed
+    if (!personalDataFilled && hasRequiredFields) {
+      await this.userFlagRepository.setPersonalDataFlag(userId, true);
+      personalDataFilled = true;
+    }
+
     return { user, profile, personalDataFilled };
   }
 
