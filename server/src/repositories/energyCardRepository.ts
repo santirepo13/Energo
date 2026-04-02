@@ -5,7 +5,7 @@ export interface IEnergyCardRepository {
   findByCardNumber: (cardNumber: string) => Promise<EnergyCard | null>;
   findByUserId: (userId: number) => Promise<EnergyCard[]>;
   findByUserIdAndCardNumber: (userId: number, cardNumber: string) => Promise<EnergyCard | null>;
-  create: (userId: number, cardNumber: string, name: string | null) => Promise<number>;
+  create: (userId: number, cardNumber: string, name: string | null) => Promise<void>;
   updateBalance: (userId: number, cardNumber: string, balance: number, kwh: number) => Promise<void>;
   updateName: (userId: number, cardNumber: string, name: string | null) => Promise<void>;
   release: (userId: number, cardNumber: string, releasedByUserId: number | null) => Promise<void>;
@@ -21,7 +21,8 @@ export class EnergyCardRepository implements IEnergyCardRepository {
       'CALL sp_energy_cards_find_by_card_number(?)',
       [cardNumber]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    // rows = [[result_set_rows], OkPacket], so rows[0] = [result_set_rows], rows[0][0] = first row object
+    return Array.isArray(rows) && rows.length && Array.isArray(rows[0]) && rows[0].length ? rows[0][0] : null;
   }
 
   async findByUserId(userId: number): Promise<EnergyCard[]> {
@@ -29,7 +30,8 @@ export class EnergyCardRepository implements IEnergyCardRepository {
       'CALL sp_energy_cards_list_by_user(?)',
       [userId]
     );
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async findByUserIdAndCardNumber(userId: number, cardNumber: string): Promise<EnergyCard | null> {
@@ -37,15 +39,15 @@ export class EnergyCardRepository implements IEnergyCardRepository {
       'CALL sp_energy_cards_get_by_user_and_card(?, ?)',
       [userId, cardNumber]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    // rows = [[result_set_rows], OkPacket], so rows[0] = [result_set_rows], rows[0][0] = first row object
+    return Array.isArray(rows) && rows.length && Array.isArray(rows[0]) && rows[0].length ? rows[0][0] : null;
   }
 
-  async create(userId: number, cardNumber: string, name: string | null): Promise<number> {
-    const [rows]: any = await this.db(
+  async create(userId: number, cardNumber: string, name: string | null): Promise<void> {
+    await this.db(
       'CALL sp_energy_cards_insert(?, ?, ?)',
       [userId, cardNumber, name]
     );
-    return rows[0].insertId;
   }
 
   async updateBalance(userId: number, cardNumber: string, balance: number, kwh: number): Promise<void> {

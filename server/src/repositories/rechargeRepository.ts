@@ -25,7 +25,8 @@ export class RechargeRepository {
       'CALL sp_recharge_pins_list_by_user(?)',
       [userId]
     );
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async findByUserIdAndCardNumber(userId: number, cardNumber: string): Promise<RechargeTransaction[]> {

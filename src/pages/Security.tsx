@@ -59,12 +59,13 @@ export default function SecurityPage() {
     }
     setAddingMeter(true);
     try {
-      const res = await meAddMeter(serial, name || undefined);
-      setMeters((prev) => {
-        const exists = prev.some((m) => m.card_number === res.meter.card_number);
-        return exists ? prev : [res.meter, ...prev];
-      });
-      setNameInputs((prev) => ({ ...prev, [res.meter.card_number]: res.meter.name ?? '' }));
+      await meAddMeter(serial, name || undefined);
+      // Re-fetch meter list from server to ensure UI matches database
+      const mr = await meListMeters();
+      setMeters(mr.meters || []);
+      const map: Record<string, string> = {};
+      (mr.meters || []).forEach((m) => { map[m.card_number] = m.name ?? ''; });
+      setNameInputs(map);
       setMetersSuccess('Medidor agregado');
       setNewMeterSerial('');
       setNewMeterName('');
