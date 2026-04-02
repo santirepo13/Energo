@@ -31,7 +31,7 @@ export const createAuthMiddleware = ({ pool }: AuthMiddlewareOptions) => {
         
         const status = (info.status_name ?? null) as string | null;
         if (status === 'Deshabilitado' || status === 'Suspendido') {
-          return res.status(403).json({ error: `Cuenta ${status}. Contacte al administrador.` });
+          return res.status(403).json({ error: `Se encuentra ${status}. Contacte al administrador.` });
         }
         
         (req as any).user = { id: userId, role: info.role_name, status };
