@@ -20,7 +20,7 @@ export const createUserRoutes = (
     try {
       const userId = (req.session as any).userId;
       const { user, profile, personalDataFilled } = await userService.getProfile(userId);
-      const dbPool = (req.app.get('dbPool') as any);
+      const dbPool = (req.app.get('db') as any);
       const energyCardService = new EnergyCardService(dbPool);
       const cards = await energyCardService.getCardsByUser(userId);
       const rechargeHistory = await rechargeService.getRechargeHistory(userId);
