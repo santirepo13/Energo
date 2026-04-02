@@ -25,9 +25,15 @@ export const createUserRoutes = (
       const energyCardService = new EnergyCardService(dbPool);
       const userRepository = new UserRepository(dbPool);
       const cards = await energyCardService.getCardsByUser(userId);
-      const rechargeHistory = await rechargeService.getRechargeHistory(userId);
-      const kwhPrice = await rechargeService.getKwhPrice();
       const roleStatus = await userRepository.getUserRoleStatusById(userId);
+
+      // Admin users get all recharge history, regular users get only their own
+      const isAdmin = roleStatus?.role_name === 'admin' || roleStatus?.role_name === 'administrator';
+      const rechargeHistory = isAdmin
+        ? await rechargeService.getAllRechargeHistory()
+        : await rechargeService.getRechargeHistory(userId);
+
+      const kwhPrice = await rechargeService.getKwhPrice();
       res.json({
         user: {
           username: user?.username || '',
