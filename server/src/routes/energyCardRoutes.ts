@@ -3,7 +3,7 @@ import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { EnergyCardService } from '../services/energyCardService';
 
-console.log('Loading energy card routes');
+console.log('Cargando rutas de tarjeta de energía');
 
 export const createEnergyCardRoutes = (energyCardService: EnergyCardService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();

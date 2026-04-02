@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 
-console.log('Loading password utility');
+console.log('Cargando utilidad de contraseña');
 
 export class PasswordUtils {
   async hashPassword(password: string): Promise<string> {

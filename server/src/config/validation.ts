@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-console.log('Loading validation schemas');
+console.log('Cargando esquemas de validación');
 
 export const validationSchemas = {
   register: Joi.object({
@@ -33,7 +33,7 @@ export const validationSchemas = {
   pin_code: Joi.string().optional(),
 }).xor('amount', 'kwh', 'pin_code').messages({
   'object.xor': 'Debe proporcionar ya sea amount, kwh o pin_code, pero solo uno',
-  'any.invalid': 'Value must be a valid number'
+  'any.invalid': 'El valor debe ser un número válido'
 }),
   
   passwordChange: Joi.object({

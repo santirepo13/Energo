@@ -3,7 +3,7 @@ import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { RechargeService } from '../services/rechargeService';
 
-console.log('Loading recharge routes');
+console.log('Cargando rutas de recarga');
 
 export const createRechargeRoutes = (rechargeService: RechargeService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();
