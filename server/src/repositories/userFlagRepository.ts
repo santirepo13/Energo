@@ -9,7 +9,8 @@ export class UserFlagRepository {
       'CALL sp_user_flags_get_personal_data_filled(?)',
       [userId]
     );
-    return Array.isArray(rows) && rows.length ? Boolean(rows[0].personal_data_filled) : false;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? Boolean(resultSet[0].personal_data_filled) : false;
   }
 
   async setPersonalDataFlag(userId: number, filled: boolean): Promise<void> {

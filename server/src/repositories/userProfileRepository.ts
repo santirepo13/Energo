@@ -9,7 +9,8 @@ export class UserProfileRepository {
       'CALL sp_user_profiles_get_by_user(?)',
       [userId]
     );
-    return Array.isArray(rows) && rows.length ? rows[0] : null;
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) && resultSet.length ? resultSet[0] : null;
   }
 
   hasRequiredFields(profile: UserProfile | null): boolean {
