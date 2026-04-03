@@ -639,7 +639,7 @@ export default function Dashboard() {
                 <TableBody>
                   {(data?.security_logs ?? []).map((l, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>{new Date(l.event_time).toLocaleString()}</TableCell>
+                      <TableCell>{l.event_time ? new Date(l.event_time).toLocaleString() : '—'}</TableCell>
                       <TableCell>{l.event_type}</TableCell>
                       <TableCell>{l.ip_address}</TableCell>
                       <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
