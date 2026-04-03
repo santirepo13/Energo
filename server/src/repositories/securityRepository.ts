@@ -36,7 +36,8 @@ export class SecurityRepository {
 
   async getSecurityLogs(): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_security_logs_latest(?)', [200]);
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getSecurityLogById(logId: number): Promise<any | null> {
@@ -46,7 +47,8 @@ export class SecurityRepository {
 
   async getSecurityLogsByUser(userId: number): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_security_logs_by_user(?)', [userId]);
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getKwhPriceHistory(): Promise<any[]> {
