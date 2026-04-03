@@ -86,3 +86,25 @@ export interface UserFlag {
   personal_data_filled: boolean;
   filled_at: Date | null;
 }
+
+export interface EmployeeCodeWithDetails {
+  id: number;
+  code: string;
+  used: number | boolean;
+  created_at: string;
+  used_at: string | null;
+  role: string | null;
+  used_by_username: string | null;
+}
+
+export interface IEnergyCardRepository {
+  findByCardNumber: (cardNumber: string) => Promise<EnergyCard | null>;
+  findByUserId: (userId: number) => Promise<EnergyCard[]>;
+  findByUserIdAndCardNumber: (userId: number, cardNumber: string) => Promise<EnergyCard | null>;
+  create: (userId: number, cardNumber: string, name: string | null) => Promise<void>;
+  updateBalance: (userId: number, cardNumber: string, balance: number, kwh: number) => Promise<void>;
+  updateName: (userId: number, cardNumber: string, name: string | null) => Promise<void>;
+  release: (userId: number, cardNumber: string, releasedByUserId: number | null) => Promise<void>;
+  claimReleased: (cardId: number, userId: number, name: string | null) => Promise<void>;
+  transferOwnership: (cardId: number, newUserId: number) => Promise<void>;
+}

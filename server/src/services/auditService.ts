@@ -1,11 +1,14 @@
 import { DatabaseFunction } from '../database/databasePool';
 import { SecurityRepository } from '../repositories/securityRepository';
+import { EmployeeCodeRepository } from '../repositories/employeeCodeRepository';
 
 export class AuditService {
   private securityRepository: SecurityRepository;
+  private employeeCodeRepository: EmployeeCodeRepository;
 
   constructor(private db: DatabaseFunction) {
     this.securityRepository = new SecurityRepository(db);
+    this.employeeCodeRepository = new EmployeeCodeRepository(db);
   }
 
   async getAuditAdmins(): Promise<any[]> {
@@ -62,5 +65,36 @@ export class AuditService {
   async getKwhPriceHistory(): Promise<any[]> {
     // Call the stored procedure to get kWh price history
     return await this.securityRepository.getKwhPriceHistory();
+  }
+
+  async getEmployeeCodes(): Promise<any[]> {
+    // Get all employee codes with details
+    return await this.employeeCodeRepository.listEmployeeCodes();
+  }
+
+  async generateEmployeeCode(role: 'admin' | 'audit'): Promise<{ id: number; code: string; role: string }> {
+    // Generate a unique employee code in format: ADMIN-XXXXXX or AUDIT-XXXXXX
+    const code = this.generateUniqueCode(role);
+
+    // Get role ID from database
+    const roleId = await this.employeeCodeRepository.getRoleIdByName(role);
+    if (!roleId) {
+      throw new Error(`Role '${role}' not found`);
+    }
+
+    // Insert the new employee code
+    const id = await this.employeeCodeRepository.createEmployeeCode(code, roleId);
+
+    return { id, code, role };
+  }
+
+  private generateUniqueCode(role: string): string {
+    // Generate a code in format: ROLE-XXXXXXXX (role prefix + dash + 8 random characters)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let randomPart = '';
+    for (let i = 0; i < 8; i++) {
+      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${role.toUpperCase()}-${randomPart}`;
   }
 }

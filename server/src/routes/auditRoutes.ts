@@ -44,6 +44,31 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
+  // Get employee codes (auditor only)
+  router.get('/employee-codes', requireAudit, async (req, res) => {
+    try {
+      const codes = await auditService.getEmployeeCodes();
+      res.json({ codes });
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load employee codes' });
+    }
+  });
+
+  // Generate employee code (auditor only)
+  router.post('/employee-codes', requireAudit, async (req, res) => {
+    try {
+      const { role } = req.body;
+      if (!role || (role !== 'admin' && role !== 'audit')) {
+        res.status(400).json({ error: 'Invalid role. Must be "admin" or "audit"' });
+        return;
+      }
+      const result = await auditService.generateEmployeeCode(role);
+      res.json(result);
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to generate employee code' });
+    }
+  });
+
   // Get audit metrics series (auditor only)
   router.get('/metrics/series', requireAudit, async (req, res) => {
     try {
