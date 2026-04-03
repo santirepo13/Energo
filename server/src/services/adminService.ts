@@ -2,6 +2,9 @@ import { DatabaseFunction } from '../database/databasePool';
 import { User } from '../models/userModel';
 import { UserRepository } from '../repositories/userRepository';
 import { EnergyCardRepository } from '../repositories/energyCardRepository';
+import { UserProfileRepository } from '../repositories/userProfileRepository';
+
+import { UserProfile } from '../models/userProfileModel';
 
 export type AdminUserDetail = {
   id: number;
@@ -11,6 +14,7 @@ export type AdminUserDetail = {
   last_login: string | null;
   role: string | null;
   status: string | null;
+  profile: UserProfile | null;
   meters: Array<{
     card_number: string;
     name: string | null;
@@ -23,10 +27,12 @@ export type AdminUserDetail = {
 export class AdminService {
   private userRepository: UserRepository;
   private energyCardRepository: EnergyCardRepository;
+  private userProfileRepository: UserProfileRepository;
 
   constructor(private db: DatabaseFunction) {
     this.userRepository = new UserRepository(db);
     this.energyCardRepository = new EnergyCardRepository(db);
+    this.userProfileRepository = new UserProfileRepository(db);
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -42,6 +48,9 @@ export class AdminService {
     // Get meters for this user
     const meters = await this.energyCardRepository.findByUserId(userId);
 
+    // Get user profile data
+    const profile = await this.userProfileRepository.getProfile(userId);
+
     return {
       id: user.id,
       username: user.username,
@@ -50,6 +59,7 @@ export class AdminService {
       last_login: user.last_login,
       role: user.role,
       status: user.status,
+      profile: profile,
       meters: meters.map(m => ({
         card_number: m.card_number,
         name: m.name,
