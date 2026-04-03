@@ -103,7 +103,7 @@ export class App {
     const authMiddleware = this.app.get('authMiddleware') as ReturnType<typeof createAuthMiddleware>;
 
     const authRoutes = createAuthRoutes(authService, authMiddleware);
-    const userRoutes = createUserRoutes(userService, authService, authMiddleware, rechargeService);
+    const userRoutes = createUserRoutes(userService, authService, authMiddleware, rechargeService, auditService);
     const adminRoutes = createAdminRoutes(userService, energyCardService, adminService, authMiddleware);
     const auditRoutes = createAuditRoutes(auditService, userService, authMiddleware);
     const energyCardRoutes = createEnergyCardRoutes(energyCardService, authMiddleware);

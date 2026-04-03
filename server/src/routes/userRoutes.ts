@@ -5,6 +5,7 @@ import { UserService } from '../services/userService';
 import { AuthService } from '../services/authService';
 import { EnergyCardService } from '../services/energyCardService';
 import { RechargeService } from '../services/rechargeService';
+import { AuditService } from '../services/auditService';
 import { UserRepository } from '../repositories/userRepository';
 
 console.log('Loading user routes');
@@ -13,7 +14,8 @@ export const createUserRoutes = (
   userService: UserService,
   authService: AuthService,
   authMiddleware: ReturnType<typeof createAuthMiddleware>,
-  rechargeService: RechargeService
+  rechargeService: RechargeService,
+  auditService?: AuditService
 ) => {
   const router = Router();
 
@@ -34,6 +36,14 @@ export const createUserRoutes = (
         : await rechargeService.getRechargeHistory(userId);
 
       const kwhPrice = await rechargeService.getKwhPrice();
+
+      // Include security logs for audit users
+      let securityLogs: any[] = [];
+      const isAudit = roleStatus?.role_name === 'audit' || roleStatus?.role_name === 'auditor';
+      if (isAudit && auditService) {
+        securityLogs = await auditService.getSecurityLogs();
+      }
+
       res.json({
         user: {
           username: user?.username || '',
@@ -46,7 +56,8 @@ export const createUserRoutes = (
         personal_data_filled: personalDataFilled,
         cards,
         recharge_history: rechargeHistory,
-        kwh_price: kwhPrice
+        kwh_price: kwhPrice,
+        security_logs: securityLogs
       });
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load profile' });
