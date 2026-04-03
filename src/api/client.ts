@@ -350,6 +350,11 @@ export async function auditGetAdmins() {
   return res.data as { admins: AdminUserRow[] };
 }
 
+export async function auditGetAdminProfile(userId: number) {
+  const res = await api.get(`/api/audit/admins/${userId}/profile`);
+  return res.data as { profile: UserProfile | null };
+}
+
 export async function auditGetEmployees() {
   const res = await api.get(`/api/audit/employees`);
   return res.data as { employees: AdminUserRow[] };

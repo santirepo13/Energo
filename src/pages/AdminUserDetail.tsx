@@ -436,7 +436,7 @@ export default function AdminUserDetail() {
                 <ListItem key={r.id ?? i}>
                   <ListItemText
                     primary={r.title || r.event_type}
-                    secondary={new Date(r.event_time).toLocaleString()}
+                    secondary={r.event_time ? new Date(r.event_time).toLocaleString() : '—'}
                   />
                 </ListItem>
               ))}

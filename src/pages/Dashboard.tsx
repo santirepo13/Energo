@@ -584,7 +584,7 @@ export default function Dashboard() {
                 <SecurityIcon sx={{ color: '#90caf9' }} />
                 <Typography variant="h6" color="inherit">Métricas de Ventas (todas)</Typography>
               </Stack>
-              {!auditMetrics ? (
+              {!auditMetrics || !auditMetrics.totals ? (
                 <Typography color="inherit">Cargando métricas…</Typography>
               ) : (
                 <Stack spacing={2}>
@@ -603,7 +603,7 @@ export default function Dashboard() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {(auditMetrics.by_day ?? []).map((r, idx) => (
+                      {(auditMetrics.by_day ?? []).filter(r => r != null).map((r, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{r.day}</TableCell>
                           <TableCell align="right">{r.codes_sold}</TableCell>
@@ -639,7 +639,7 @@ export default function Dashboard() {
                 <TableBody>
                   {(data?.security_logs ?? []).map((l, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>{new Date(l.event_time).toLocaleString()}</TableCell>
+                      <TableCell>{l.event_time ? new Date(l.event_time).toLocaleString() : '—'}</TableCell>
                       <TableCell>{l.event_type}</TableCell>
                       <TableCell>{l.ip_address}</TableCell>
                       <TableCell sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

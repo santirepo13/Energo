@@ -13,17 +13,22 @@ export class SecurityRepository {
 
   async getAuditAdmins(): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_audit_list_admins()');
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getAuditEmployees(): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_audit_list_employees()');
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
-  async getAuditMetricsSeries(): Promise<any[]> {
-    const [rows]: any = await this.db('CALL sp_audit_metrics_series()');
-    return Array.isArray(rows) ? rows : [];
+  async getAuditMetricsSeries(): Promise<{ totals: any[]; by_day: any[] }> {
+    const [result]: any = await this.db('CALL sp_audit_metrics_series(?)', [30]);
+    // Stored procedure returns two result sets: totals and by_day
+    const totals = Array.isArray(result[0]) ? result[0] : [];
+    const by_day = Array.isArray(result[1]) ? result[1] : [];
+    return { totals, by_day };
   }
 
   async getAuditMetricsTotals(): Promise<any[]> {
@@ -32,8 +37,9 @@ export class SecurityRepository {
   }
 
   async getSecurityLogs(): Promise<any[]> {
-    const [rows]: any = await this.db('CALL sp_security_logs_latest()');
-    return Array.isArray(rows) ? rows : [];
+    const [rows]: any = await this.db('CALL sp_security_logs_latest(?)', [200]);
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getSecurityLogById(logId: number): Promise<any | null> {
@@ -43,7 +49,8 @@ export class SecurityRepository {
 
   async getSecurityLogsByUser(userId: number): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_security_logs_by_user(?)', [userId]);
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getKwhPriceHistory(): Promise<any[]> {

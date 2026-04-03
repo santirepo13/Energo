@@ -1,17 +1,6 @@
 import { DatabaseFunction } from '../database/databasePool';
 import { EnergyCard } from '../models/energyCardModel';
-
-export interface IEnergyCardRepository {
-  findByCardNumber: (cardNumber: string) => Promise<EnergyCard | null>;
-  findByUserId: (userId: number) => Promise<EnergyCard[]>;
-  findByUserIdAndCardNumber: (userId: number, cardNumber: string) => Promise<EnergyCard | null>;
-  create: (userId: number, cardNumber: string, name: string | null) => Promise<void>;
-  updateBalance: (userId: number, cardNumber: string, balance: number, kwh: number) => Promise<void>;
-  updateName: (userId: number, cardNumber: string, name: string | null) => Promise<void>;
-  release: (userId: number, cardNumber: string, releasedByUserId: number | null) => Promise<void>;
-  claimReleased: (cardId: number, userId: number, name: string | null) => Promise<void>;
-  transferOwnership: (cardId: number, newUserId: number) => Promise<void>;
-}
+import {IEnergyCardRepository} from '../types/interfaces'
 
 export class EnergyCardRepository implements IEnergyCardRepository {
   constructor(private db: DatabaseFunction) {}
