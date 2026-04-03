@@ -70,7 +70,9 @@ export const validationSchemas = {
     new_password: Joi.string().min(12).required(),
   }),
   
-  statusUpdate: Joi.string().valid('Pausa', 'Deshabilitado').required(),
+  statusUpdate: Joi.object({
+    status: Joi.string().valid('Activo', 'Pausa', 'Deshabilitado').required(),
+  }).required(),
   
   meterLink: Joi.object({
     card_number: Joi.string().required(),
