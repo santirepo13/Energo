@@ -22,7 +22,7 @@ export class SecurityRepository {
   }
 
   async getAuditMetricsSeries(): Promise<{ totals: any[]; by_day: any[] }> {
-    const result: any = await this.db('CALL sp_audit_metrics_series(?)', [30]);
+    const [result]: any = await this.db('CALL sp_audit_metrics_series(?)', [30]);
     // Stored procedure returns two result sets: totals and by_day
     const totals = Array.isArray(result[0]) ? result[0] : [];
     const by_day = Array.isArray(result[1]) ? result[1] : [];
