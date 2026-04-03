@@ -355,6 +355,14 @@ export async function auditGetAdminProfile(userId: number) {
   return res.data as { profile: UserProfile | null };
 }
 
+export async function auditUpdateAdminStatus(
+  id: number,
+  status: 'Activo' | 'Deshabilitado'
+) {
+  const res = await api.patch(`/api/audit/admins/${id}/status`, { status });
+  return res.data as { message: string };
+}
+
 export async function auditGetEmployees() {
   const res = await api.get(`/api/audit/employees`);
   return res.data as { employees: AdminUserRow[] };
