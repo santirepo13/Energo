@@ -215,13 +215,13 @@ export class AuthService {
     }
   }
 
-  private async findEnergyCardDirect(cardNumber: string): Promise<any | null> {
-    try {
-      const [rows]: any = await this.db(
-        'CALL sp_energy_cards_find_by_card_number(?)',
-        [cardNumber]
-      );
-      return Array.isArray(rows) && rows.length ? rows[0] : null;
+   private async findEnergyCardDirect(cardNumber: string): Promise<any | null> {
+     try {
+       const [rows]: any = await this.db(
+         'CALL sp_energy_cards_find_by_card_number(?)',
+         [cardNumber]
+       );
+       return Array.isArray(rows) && rows.length && Array.isArray(rows[0]) && rows[0].length ? rows[0][0] : null;
     } catch (e: any) {
       if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
         return await this.findEnergyCardRawDirect(cardNumber);
