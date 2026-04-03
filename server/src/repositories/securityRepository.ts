@@ -22,7 +22,7 @@ export class SecurityRepository {
   }
 
   async getAuditMetricsSeries(): Promise<any[]> {
-    const [rows]: any = await this.db('CALL sp_audit_metrics_series()');
+    const [rows]: any = await this.db('CALL sp_audit_metrics_series(?)', [30]);
     return Array.isArray(rows) ? rows : [];
   }
 
@@ -32,7 +32,7 @@ export class SecurityRepository {
   }
 
   async getSecurityLogs(): Promise<any[]> {
-    const [rows]: any = await this.db('CALL sp_security_logs_latest()');
+    const [rows]: any = await this.db('CALL sp_security_logs_latest(?)', [200]);
     return Array.isArray(rows) ? rows : [];
   }
 
