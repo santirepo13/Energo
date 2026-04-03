@@ -450,6 +450,7 @@ DROP PROCEDURE IF EXISTS `sp_users_insert`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_insert` (IN `p_username` VARCHAR(50), IN `p_password_hash` VARCHAR(255), IN `p_email` VARCHAR(100), IN `p_role_id` INT, IN `p_status_id` INT)   BEGIN
   INSERT INTO users (username, password_hash, email, role_id, status_id)
   VALUES (p_username, p_password_hash, p_email, p_role_id, p_status_id);
+  SELECT LAST_INSERT_ID() AS inserted_id;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_users_select_login_by_username`$$

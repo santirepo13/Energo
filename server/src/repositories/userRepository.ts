@@ -27,7 +27,11 @@ export class UserRepository {
       'CALL sp_users_insert(?, ?, ?, ?, ?)',
       [userData.username, userData.password_hash, userData.email, userData.role_id, userData.status_id]
     );
-    return rows[0].insertId;
+    const insertedId = Number((rows[0] || {}).inserted_id);
+    if (!Number.isInteger(insertedId) || insertedId <= 0) {
+      throw new Error('Failed to retrieve inserted user ID');
+    }
+    return insertedId;
   }
 
   async updateEmail(id: number, email: string): Promise<void> {
