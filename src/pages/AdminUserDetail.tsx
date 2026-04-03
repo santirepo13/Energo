@@ -67,7 +67,7 @@ export default function AdminUserDetail() {
         adminGetUserLogs(userId),
       ]);
       setUser(dRes.user);
-      setProfile(null);
+      setProfile(dRes.user.profile || null);
       setMeters((dRes.user.meters || []).map(m => ({
         card_number: m.card_number,
         name: m.name,

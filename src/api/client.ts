@@ -268,6 +268,7 @@ export type AdminUserDetail = {
   last_login: string | null;
   role: string | null;
   status: string | null;
+  profile: UserProfile | null;
   logs: Array<{
     event_type: string;
     event_time: string;
