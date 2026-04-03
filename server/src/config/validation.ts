@@ -7,8 +7,8 @@ export const validationSchemas = {
     username: Joi.string().min(3).max(50).required(),
     password: Joi.string().min(12).required(),
     email: Joi.string().email().required(),
-    card_number: Joi.string().allow('').optional(),
-    employee_code: Joi.string().allow('').optional(),
+    card_number: Joi.string().trim().allow('').optional(),
+    employee_code: Joi.string().trim().allow('').optional(),
   }),
   
   login: Joi.object({

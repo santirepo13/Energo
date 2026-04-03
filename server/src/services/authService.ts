@@ -146,20 +146,25 @@ export class AuthService {
   }
 
   private async createEnergyCardDirect(userId: number, cardNumber: string | null): Promise<string | null> {
-    if (!cardNumber) return null;
+    // Sanitize cardNumber: reject NaN, non-string types, and empty/whitespace-only strings
+    if (!cardNumber || typeof cardNumber !== 'string' || cardNumber.trim() === '') {
+      return null;
+    }
+    
+    const sanitizedCardNumber = cardNumber.trim();
     
     try {
-      const card = await this.findEnergyCardDirect(cardNumber);
+      const card = await this.findEnergyCardDirect(sanitizedCardNumber);
       if (card) {
         if (card.user_id == null) {
           await this.db('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [card.id, userId, null]);
-          return cardNumber;
+          return sanitizedCardNumber;
         } else {
           throw new Error('Medidor ya enlazado, por favor contacte a soporte');
         }
       } else {
-        await this.db('CALL sp_energy_cards_insert(?, ?, ?)', [userId, cardNumber, null]);
-        return cardNumber;
+        await this.db('CALL sp_energy_cards_insert(?, ?, ?)', [userId, sanitizedCardNumber, null]);
+        return sanitizedCardNumber;
       }
     } catch (e: any) {
       if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
