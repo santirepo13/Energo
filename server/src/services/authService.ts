@@ -40,7 +40,7 @@ export class AuthService {
 
   async register(userData: any): Promise<{ userId: number; cardNumber: string | null }> {
     try {
-      let roleId = userData.role_id || 1; // Default to normal user (role_id=1)
+      let roleId = userData.role_id || 3; // Default to normal user (role_id=3)
       let employeeCodeId: number | null = null;
 
       // If employee code is provided, validate it and get the associated role
@@ -175,7 +175,7 @@ export class AuthService {
     const password_hash = await bcrypt.hash(userData.password, 10);
     const [rows]: any = await this.db(
       'CALL sp_users_insert(?, ?, ?, ?, ?)',
-      [userData.username, password_hash, userData.email, userData.role_id || 1, userData.status_id || 1]
+      [userData.username, password_hash, userData.email, userData.role_id || 3, userData.status_id || 1]
     );
     // rows structure: [[{ inserted_id: N }], OkPacket] - need rows[0][0] to get the row object
     const firstSet = Array.isArray(rows) ? rows[0] : rows;
