@@ -22,6 +22,17 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
+  // Get admin profile (auditor only)
+  router.get('/admins/:id/profile', requireAudit, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await userService.getProfile(Number(id));
+      res.json({ profile: result.profile });
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load admin profile' });
+    }
+  });
+
   // Update admin profile (auditor only) - uses existing user profile update logic
   router.put('/admins/:id/profile', requireAudit, createValidationMiddleware().validate('profileUpdate'), async (req, res) => {
     try {
@@ -29,8 +40,20 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
       const profileData = req.body;
       await userService.updateProfile(Number(id), profileData);
       res.json({ message: 'Profile updated' });
-    } catch (e) {
-      res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to update profile' });
+    } catch (e: any) {
+      // Handle unique constraint errors with user-friendly messages
+      const errorMessage = e instanceof Error ? e.message : 'Failed to update profile';
+      let userFriendlyError = errorMessage;
+
+      if (errorMessage.includes('uniq_documento')) {
+        userFriendlyError = 'El número de identificación ya está registrado para otro usuario';
+      } else if (errorMessage.includes('uniq_phone')) {
+        userFriendlyError = 'El teléfono ya está registrado para otro usuario';
+      } else if (errorMessage.includes('duplicate')) {
+        userFriendlyError = 'Ya existe un registro con estos datos';
+      }
+
+      res.status(400).json({ error: userFriendlyError });
     }
   });
 

@@ -19,8 +19,8 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditAttributesIcon from '@mui/icons-material/EditAttributes';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, auditGetAdmins } from '../api/client';
-import type { AdminUserRow, UpdateProfileRequest } from '../api/client';
+import { api, auditGetAdmins, auditGetAdminProfile } from '../api/client';
+import type { AdminUserRow, UpdateProfileRequest, UserProfile } from '../api/client';
 
 const DOC_TYPES = ['CC','CE','Pasaporte','PEP','RIF'] as const;
 const ADMIN_STATUS_OPTIONS: ReadonlyArray<'Activo' | 'Deshabilitado'> = ['Activo', 'Deshabilitado'];
@@ -65,17 +65,47 @@ export default function AuditAdminDetail() {
         setUser(user);
       }
 
-      // Profile data load is not available via auditGetAdmins, keep existing form logic
-      setForm({
-        primer_nombre: '',
-        segundo_nombre: '',
-        primer_apellido: '',
-        segundo_apellido: '',
-        tipo_identificacion: 'CC',
-        numero_identificacion: '',
-        direccion: '',
-        telefono: '',
-      });
+      // Load profile data from the new GET endpoint
+      try {
+        const profileRes = await auditGetAdminProfile(userId);
+        const profile = profileRes.profile;
+        if (profile) {
+          setForm({
+            primer_nombre: profile.primer_nombre || '',
+            segundo_nombre: profile.segundo_nombre || '',
+            primer_apellido: profile.primer_apellido || '',
+            segundo_apellido: profile.segundo_apellido || '',
+            tipo_identificacion: profile.tipo_identificacion || 'CC',
+            numero_identificacion: profile.numero_identificacion || '',
+            direccion: profile.direccion || '',
+            telefono: profile.telefono || '',
+          });
+        } else {
+          // No profile exists yet, initialize with empty values
+          setForm({
+            primer_nombre: '',
+            segundo_nombre: '',
+            primer_apellido: '',
+            segundo_apellido: '',
+            tipo_identificacion: 'CC',
+            numero_identificacion: '',
+            direccion: '',
+            telefono: '',
+          });
+        }
+      } catch (profileErr: any) {
+        // Profile load failed, initialize with empty values
+        setForm({
+          primer_nombre: '',
+          segundo_nombre: '',
+          primer_apellido: '',
+          segundo_apellido: '',
+          tipo_identificacion: 'CC',
+          numero_identificacion: '',
+          direccion: '',
+          telefono: '',
+        });
+      }
     } catch (e: any) {
       setError(e?.response?.data?.error || e?.message || 'No se pudo cargar el admin');
     } finally {
