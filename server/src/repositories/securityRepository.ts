@@ -13,12 +13,14 @@ export class SecurityRepository {
 
   async getAuditAdmins(): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_audit_list_admins()');
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getAuditEmployees(): Promise<any[]> {
     const [rows]: any = await this.db('CALL sp_audit_list_employees()');
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async getAuditMetricsSeries(): Promise<{ totals: any[]; by_day: any[] }> {
