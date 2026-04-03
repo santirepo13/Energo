@@ -18,9 +18,23 @@ export class AuditService {
     return await this.securityRepository.getAuditEmployees();
   }
 
-  async getAuditMetricsSeries(): Promise<any[]> {
-    // Call the stored procedure to get audit metrics series
-    return await this.securityRepository.getAuditMetricsSeries();
+  async getAuditMetricsSeries(): Promise<{ totals: any; by_day: any[] }> {
+    const result = await this.securityRepository.getAuditMetricsSeries();
+    // Transform to match frontend AuditMetrics structure
+    const totalsRow = result.totals[0] || { pins: 0, total_amount: 0, total_kwh: 0 };
+    return {
+      totals: {
+        codes_sold: totalsRow.pins || 0,
+        amount_cop: totalsRow.total_amount || 0,
+        kwh: totalsRow.total_kwh || 0
+      },
+      by_day: result.by_day.map(row => ({
+        day: row.day ? new Date(row.day).toISOString().split('T')[0] : '',
+        codes_sold: row.pins || 0,
+        amount_cop: row.total_amount || 0,
+        kwh: row.total_kwh || 0
+      }))
+    };
   }
 
   async getAuditMetricsTotals(): Promise<any[]> {

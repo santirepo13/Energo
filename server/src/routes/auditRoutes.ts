@@ -9,11 +9,11 @@ console.log('Cargando rutas de auditoría');
 export const createAuditRoutes = (auditService: AuditService, userService: UserService, authMiddleware: ReturnType<typeof createAuthMiddleware>) => {
   const router = Router();
 
-  // Admin-only middleware
-  const requireAdmin = authMiddleware.requireAuth;
-  
-  // Get audit admins (audithor only)
-  router.get('/admins', requireAdmin, async (req, res) => {
+  // Audit-only middleware
+  const requireAudit = authMiddleware.requireAudit;
+
+  // Get audit admins (auditor only)
+  router.get('/admins', requireAudit, async (req, res) => {
     try {
       const admins = await auditService.getAuditAdmins();
       res.json({ admins });
@@ -23,7 +23,7 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
   });
 
   // Update admin profile (auditor only) - uses existing user profile update logic
-  router.put('/admins/:id/profile', requireAdmin, createValidationMiddleware().validate('profileUpdate'), async (req, res) => {
+  router.put('/admins/:id/profile', requireAudit, createValidationMiddleware().validate('profileUpdate'), async (req, res) => {
     try {
       const { id } = req.params;
       const profileData = req.body;
@@ -34,8 +34,8 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
-  // Get audit employees (audithor only)
-  router.get('/employees', requireAdmin, async (req, res) => {
+  // Get audit employees (auditor only)
+  router.get('/employees', requireAudit, async (req, res) => {
     try {
       const employees = await auditService.getAuditEmployees();
       res.json({ employees });
@@ -44,18 +44,18 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
-  // Get audit metrics series (audithor only)
-  router.get('/metrics/series', requireAdmin, async (req, res) => {
+  // Get audit metrics series (auditor only)
+  router.get('/metrics/series', requireAudit, async (req, res) => {
     try {
       const metrics = await auditService.getAuditMetricsSeries();
-      res.json({ metrics });
+      res.json(metrics);
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to load audit metrics series' });
     }
   });
 
-  // Get audit metrics totals (audithor only)
-  router.get('/metrics/totals', requireAdmin, async (req, res) => {
+  // Get audit metrics totals (auditor only)
+  router.get('/metrics/totals', requireAudit, async (req, res) => {
     try {
       const totals = await auditService.getAuditMetricsTotals();
       res.json({ totals });
@@ -64,8 +64,8 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
-  // Get security logs (audithor only)
-  router.get('/security-logs', requireAdmin, async (req, res) => {
+  // Get security logs (auditor only)
+  router.get('/security-logs', requireAudit, async (req, res) => {
     try {
       const logs = await auditService.getSecurityLogs();
       res.json({ logs });
@@ -74,8 +74,8 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
-  // Get security log by ID (audithor only)
-  router.get('/security-logs/:id', requireAdmin, async (req, res) => {
+  // Get security log by ID (auditor only)
+  router.get('/security-logs/:id', requireAudit, async (req, res) => {
     try {
       const { id } = req.params;
       const log = await auditService.getSecurityLogById(Number(id));
@@ -85,8 +85,8 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
-  // Get security logs by user (audithor only)
-  router.get('/security-logs/user/:userId', requireAdmin, async (req, res) => {
+  // Get security logs by user (auditor only)
+  router.get('/security-logs/user/:userId', requireAudit, async (req, res) => {
     try {
       const { userId } = req.params;
       const logs = await auditService.getSecurityLogsByUser(Number(userId));
@@ -96,8 +96,8 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
-  // Get kWh price history (audithor only)
-  router.get('/kwh-price-history', requireAdmin, async (req, res) => {
+  // Get kWh price history (auditor only)
+  router.get('/kwh-price-history', requireAudit, async (req, res) => {
     try {
       const history = await auditService.getKwhPriceHistory();
       res.json({ history });

@@ -65,11 +65,23 @@ DROP PROCEDURE IF EXISTS `sp_audit_metrics_series`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_audit_metrics_series` (IN `p_days` INT)   BEGIN
   IF p_days IS NULL OR p_days <= 0 THEN SET p_days = 30;
   END IF;
+
+  -- Return totals
   SELECT COUNT(*) AS pins,
          COALESCE(SUM(amount),0) AS total_amount,
          COALESCE(SUM(kwh),0) AS total_kwh
   FROM recharge_pins
   WHERE created_at >= DATE_SUB(CURRENT_DATE, INTERVAL p_days DAY);
+
+  -- Return daily breakdown
+  SELECT DATE(created_at) AS day,
+         COUNT(*) AS pins,
+         COALESCE(SUM(amount),0) AS total_amount,
+         COALESCE(SUM(kwh),0) AS total_kwh
+  FROM recharge_pins
+  WHERE created_at >= DATE_SUB(CURRENT_DATE, INTERVAL p_days DAY)
+  GROUP BY DATE(created_at)
+  ORDER BY day DESC;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_audit_metrics_totals`$$

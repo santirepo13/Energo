@@ -21,9 +21,12 @@ export class SecurityRepository {
     return Array.isArray(rows) ? rows : [];
   }
 
-  async getAuditMetricsSeries(): Promise<any[]> {
-    const [rows]: any = await this.db('CALL sp_audit_metrics_series(?)', [30]);
-    return Array.isArray(rows) ? rows : [];
+  async getAuditMetricsSeries(): Promise<{ totals: any[]; by_day: any[] }> {
+    const result: any = await this.db('CALL sp_audit_metrics_series(?)', [30]);
+    // Stored procedure returns two result sets: totals and by_day
+    const totals = Array.isArray(result[0]) ? result[0] : [];
+    const by_day = Array.isArray(result[1]) ? result[1] : [];
+    return { totals, by_day };
   }
 
   async getAuditMetricsTotals(): Promise<any[]> {
