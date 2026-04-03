@@ -35,7 +35,8 @@ export class EmployeeCodeRepository {
 
   async listEmployeeCodes(): Promise<EmployeeCodeWithDetails[]> {
     const [rows]: any = await this.db('CALL sp_employee_codes_list()');
-    return Array.isArray(rows) ? rows : [];
+    const resultSet = Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows;
+    return Array.isArray(resultSet) ? resultSet : [];
   }
 
   async createEmployeeCode(code: string, roleId: number): Promise<number> {
