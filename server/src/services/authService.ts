@@ -175,7 +175,7 @@ export class AuthService {
     const password_hash = await bcrypt.hash(userData.password, 10);
     const [rows]: any = await this.db(
       'CALL sp_users_insert(?, ?, ?, ?, ?)',
-      [userData.username, password_hash, userData.email, userData.role_id || 2, userData.status_id || 1]
+      [userData.username, password_hash, userData.email, userData.role_id || 1, userData.status_id || 1]
     );
     // rows structure: [[{ inserted_id: N }], OkPacket] - need rows[0][0] to get the row object
     const firstSet = Array.isArray(rows) ? rows[0] : rows;
