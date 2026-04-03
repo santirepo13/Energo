@@ -40,12 +40,47 @@ export class AuthService {
 
   async register(userData: any): Promise<{ userId: number; cardNumber: string | null }> {
     try {
-      // Create user directly without transaction
-      const userId = await this.createUserDirect(userData);
-      
-      // Create energy card directly without transaction
-      const cardNumber = await this.createEnergyCardDirect(userId, userData.card_number);
-      
+      let roleId = userData.role_id || 2; // Default to normal user (role_id=2)
+      let employeeCodeId: number | null = null;
+
+      // If employee code is provided, validate it and get the associated role
+      if (userData.employee_code) {
+        const code = String(userData.employee_code).trim();
+        if (!code) {
+          throw new Error('El código de empleado es obligatorio');
+        }
+
+        // Look up the employee code (locks row for update)
+        const employeeCode = await this.employeeCodeRepository.getEmployeeCode(code);
+        
+        if (!employeeCode) {
+          throw new Error('Código de empleado no válido');
+        }
+
+        if (employeeCode.used) {
+          throw new Error('Código de empleado ya ha sido utilizado');
+        }
+
+        // Use the role_id from the employee code
+        roleId = employeeCode.role_id;
+        employeeCodeId = employeeCode.id;
+      }
+
+      // Create user with the determined role_id
+      const userId = await this.createUserDirect({ ...userData, role_id: roleId });
+
+      // Create energy card (only if not registering with employee code)
+      let cardNumber: string | null = null;
+      if (!userData.employee_code && userData.card_number) {
+        cardNumber = await this.createEnergyCardDirect(userId, userData.card_number);
+      }
+
+      // Mark employee code as used if one was provided
+      if (employeeCodeId !== null) {
+        const usageId = await this.employeeCodeRepository.createEmployeeCodeUsage(employeeCodeId, userId);
+        await this.employeeCodeRepository.markEmployeeCodeUsed(employeeCodeId, usageId);
+      }
+
       return { userId, cardNumber };
     } catch (error) {
       throw error;
