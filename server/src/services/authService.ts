@@ -142,7 +142,9 @@ export class AuthService {
       'CALL sp_users_insert(?, ?, ?, ?, ?)',
       [userData.username, password_hash, userData.email, userData.role_id || 2, userData.status_id || 1]
     );
-    const insertedId = Number((rows[0] || {}).inserted_id);
+    // rows structure: [[{ inserted_id: N }], OkPacket] - need rows[0][0] to get the row object
+    const firstSet = Array.isArray(rows) ? rows[0] : rows;
+    const insertedId = Number(firstSet && firstSet.length ? firstSet[0].inserted_id : undefined);
     if (!Number.isInteger(insertedId) || insertedId <= 0) {
       throw new Error('Failed to retrieve inserted user ID');
     }
