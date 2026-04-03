@@ -584,7 +584,7 @@ export default function Dashboard() {
                 <SecurityIcon sx={{ color: '#90caf9' }} />
                 <Typography variant="h6" color="inherit">Métricas de Ventas (todas)</Typography>
               </Stack>
-              {!auditMetrics ? (
+              {!auditMetrics || !auditMetrics.totals ? (
                 <Typography color="inherit">Cargando métricas…</Typography>
               ) : (
                 <Stack spacing={2}>
