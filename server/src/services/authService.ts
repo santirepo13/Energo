@@ -40,7 +40,7 @@ export class AuthService {
 
   async register(userData: any): Promise<{ userId: number; cardNumber: string | null }> {
     try {
-      let roleId = userData.role_id || 2; // Default to normal user (role_id=2)
+      let roleId = userData.role_id || 1; // Default to normal user (role_id=1)
       let employeeCodeId: number | null = null;
 
       // If employee code is provided, validate it and get the associated role
