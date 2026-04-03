@@ -603,7 +603,7 @@ export default function Dashboard() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {(auditMetrics.by_day ?? []).map((r, idx) => (
+                      {(auditMetrics.by_day ?? []).filter(r => r != null).map((r, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{r.day}</TableCell>
                           <TableCell align="right">{r.codes_sold}</TableCell>

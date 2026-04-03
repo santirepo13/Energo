@@ -28,12 +28,14 @@ export class AuditService {
         amount_cop: totalsRow.total_amount || 0,
         kwh: totalsRow.total_kwh || 0
       },
-      by_day: result.by_day.map(row => ({
-        day: row.day ? new Date(row.day).toISOString().split('T')[0] : '',
-        codes_sold: row.pins || 0,
-        amount_cop: row.total_amount || 0,
-        kwh: row.total_kwh || 0
-      }))
+      by_day: (result.by_day ?? [])
+        .filter(row => row != null && typeof row === 'object')
+        .map(row => ({
+          day: row.day ? new Date(row.day).toISOString().split('T')[0] : '',
+          codes_sold: row.pins || 0,
+          amount_cop: row.total_amount || 0,
+          kwh: row.total_kwh || 0
+        }))
     };
   }
 
