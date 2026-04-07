@@ -102,6 +102,7 @@ END$$
 DROP PROCEDURE IF EXISTS `sp_employee_codes_insert`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_employee_codes_insert` (IN `p_code` VARCHAR(100), IN `p_role_id` INT)   BEGIN
   INSERT INTO employee_codes (code, role_id, used) VALUES (p_code, p_role_id, 0);
+  SELECT LAST_INSERT_ID() AS inserted_id;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_employee_codes_list`$$
@@ -131,6 +132,7 @@ END$$
 DROP PROCEDURE IF EXISTS `sp_employee_code_usages_insert`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_employee_code_usages_insert` (IN `p_employee_code_id` INT, IN `p_user_id` INT)   BEGIN
   INSERT INTO employee_code_usages (employee_code_id, user_id) VALUES (p_employee_code_id, p_user_id);
+  SELECT LAST_INSERT_ID() AS inserted_id;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_energy_cards_claim_released_by_id`$$

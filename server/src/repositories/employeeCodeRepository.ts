@@ -32,10 +32,11 @@ export class EmployeeCodeRepository {
       'CALL sp_employee_code_usages_insert(?, ?)',
       [codeId, userId]
     );
-    // Stored procedures without explicit SELECT return OkPacket in rows[1]
-    // rows structure: [ResultSet, OkPacket] - need rows[1].insertId for INSERT-only procedures
-    const okPacket = Array.isArray(rows) && rows.length > 1 ? rows[1] : rows[0];
-    const insertedId = Number(okPacket && okPacket.insertId !== undefined ? okPacket.insertId : undefined);
+    // Now returns result set with inserted_id from SELECT LAST_INSERT_ID()
+    const result = Array.isArray(rows) && rows[0] && Array.isArray(rows[0]) && rows[0][0]
+      ? rows[0][0]
+      : rows[0];
+    const insertedId = Number(result && result.inserted_id !== undefined ? result.inserted_id : undefined);
     if (!Number.isInteger(insertedId) || insertedId <= 0) {
       throw new Error('Failed to retrieve inserted employee code usage ID');
     }
@@ -53,10 +54,11 @@ export class EmployeeCodeRepository {
       'CALL sp_employee_codes_insert(?, ?)',
       [code, roleId]
     );
-    // Stored procedures without explicit SELECT return OkPacket in rows[1]
-    // rows structure: [ResultSet, OkPacket] - need rows[1].insertId for INSERT-only procedures
-    const okPacket = Array.isArray(rows) && rows.length > 1 ? rows[1] : rows[0];
-    const insertedId = Number(okPacket && okPacket.insertId !== undefined ? okPacket.insertId : undefined);
+    // Now returns result set with inserted_id from SELECT LAST_INSERT_ID()
+    const result = Array.isArray(rows) && rows[0] && Array.isArray(rows[0]) && rows[0][0]
+      ? rows[0][0]
+      : rows[0];
+    const insertedId = Number(result && result.inserted_id !== undefined ? result.inserted_id : undefined);
     if (!Number.isInteger(insertedId) || insertedId <= 0) {
       throw new Error('Failed to retrieve inserted employee code ID');
     }
