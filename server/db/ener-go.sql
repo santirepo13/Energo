@@ -799,6 +799,15 @@ CREATE TABLE IF NOT EXISTS `roles` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`name`, `description`) VALUES
+('admin', 'Administrator role with full access'),
+('audit', 'Audit role for compliance and monitoring'),
+('user', 'Standard user role');
+
+--
 -- RELATIONSHIPS FOR TABLE `roles`:
 --
 
