@@ -32,7 +32,14 @@ export class EmployeeCodeRepository {
       'CALL sp_employee_code_usages_insert(?, ?)',
       [codeId, userId]
     );
-    return rows[0].insertId;
+    // Stored procedures without explicit SELECT return OkPacket in rows[1]
+    // rows structure: [ResultSet, OkPacket] - need rows[1].insertId for INSERT-only procedures
+    const okPacket = Array.isArray(rows) && rows.length > 1 ? rows[1] : rows[0];
+    const insertedId = Number(okPacket && okPacket.insertId !== undefined ? okPacket.insertId : undefined);
+    if (!Number.isInteger(insertedId) || insertedId <= 0) {
+      throw new Error('Failed to retrieve inserted employee code usage ID');
+    }
+    return insertedId;
   }
 
   async listEmployeeCodes(): Promise<EmployeeCodeWithDetails[]> {
@@ -46,7 +53,14 @@ export class EmployeeCodeRepository {
       'CALL sp_employee_codes_insert(?, ?)',
       [code, roleId]
     );
-    return rows[0].insertId;
+    // Stored procedures without explicit SELECT return OkPacket in rows[1]
+    // rows structure: [ResultSet, OkPacket] - need rows[1].insertId for INSERT-only procedures
+    const okPacket = Array.isArray(rows) && rows.length > 1 ? rows[1] : rows[0];
+    const insertedId = Number(okPacket && okPacket.insertId !== undefined ? okPacket.insertId : undefined);
+    if (!Number.isInteger(insertedId) || insertedId <= 0) {
+      throw new Error('Failed to retrieve inserted employee code ID');
+    }
+    return insertedId;
   }
 
   async getRoleIdByName(roleName: string): Promise<number | null> {

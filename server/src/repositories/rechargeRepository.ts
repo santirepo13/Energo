@@ -9,7 +9,14 @@ export class RechargeRepository {
       'CALL sp_recharge_pins_insert(?, ?, ?, ?, ?)',
       [userId, cardNumber, pinCode, amount, kwh]
     );
-    return rows[0].insertId;
+    // Stored procedures without explicit SELECT return OkPacket in rows[1]
+    // rows structure: [ResultSet, OkPacket] - need rows[1].insertId for INSERT-only procedures
+    const okPacket = Array.isArray(rows) && rows.length > 1 ? rows[1] : rows[0];
+    const insertedId = Number(okPacket && okPacket.insertId !== undefined ? okPacket.insertId : undefined);
+    if (!Number.isInteger(insertedId) || insertedId <= 0) {
+      throw new Error('Failed to retrieve inserted recharge pin ID');
+    }
+    return insertedId;
   }
 
   async createTransaction(userId: number, cardNumber: string, amount: number, kwh: number): Promise<number> {
@@ -17,7 +24,14 @@ export class RechargeRepository {
       'CALL sp_recharge_transactions_insert(?, ?, ?, ?)',
       [userId, cardNumber, amount, kwh]
     );
-    return rows[0].insertId;
+    // Stored procedures without explicit SELECT return OkPacket in rows[1]
+    // rows structure: [ResultSet, OkPacket] - need rows[1].insertId for INSERT-only procedures
+    const okPacket = Array.isArray(rows) && rows.length > 1 ? rows[1] : rows[0];
+    const insertedId = Number(okPacket && okPacket.insertId !== undefined ? okPacket.insertId : undefined);
+    if (!Number.isInteger(insertedId) || insertedId <= 0) {
+      throw new Error('Failed to retrieve inserted recharge transaction ID');
+    }
+    return insertedId;
   }
 
   async findByUserId(userId: number): Promise<RechargeTransaction[]> {
