@@ -35,7 +35,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_admin_list_users` ()   BEGIN
   FROM users u
   LEFT JOIN roles r ON r.id = u.role_id
   LEFT JOIN statuses s ON s.id = u.status_id
-  WHERE r.name COLLATE utf8mb4_general_ci <> 'audit'
+  WHERE r.name COLLATE utf8mb4_general_ci = 'user'
   ORDER BY u.created_at DESC;
 END$$
 
