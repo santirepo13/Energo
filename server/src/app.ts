@@ -78,6 +78,7 @@ export class App {
     this.app.use(securityMiddleware.blockHiddenFiles);
 
     const sessionStore = new MySQLSessionStore(getDatabaseFunction());
+    const clientOriginIsHttps = config.clientOrigin.startsWith('https://');
     this.app.use(
       session({
         store: sessionStore,
@@ -85,9 +86,10 @@ export class App {
         resave: false,
         saveUninitialized: false,
         cookie: {
-          secure: process.env.NODE_ENV === 'production',
+          secure: process.env.NODE_ENV === 'production' && clientOriginIsHttps,
           httpOnly: true,
           maxAge: 7 * 24 * 60 * 60 * 1000,
+          sameSite: 'lax'
         },
       })
     );
