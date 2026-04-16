@@ -13,6 +13,7 @@ export const createSecurityMiddleware = (config: SecurityConfig) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'DENY');
       res.setHeader('Content-Security-Policy', "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; form-action 'none'; font-src 'self' data: https://r2cdn.perplexity.ai");
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
       next();
     },
     
