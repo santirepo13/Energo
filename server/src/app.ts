@@ -78,7 +78,10 @@ export class App {
     this.app.use(securityMiddleware.blockHiddenFiles);
 
     const sessionStore = new MySQLSessionStore(getDatabaseFunction());
-    const clientOriginIsHttps = config.clientOrigin.startsWith('https://');
+    // clientOrigin can be string or array, check first origin for protocol
+    const firstOrigin = Array.isArray(config.clientOrigin) ? config.clientOrigin[0] : config.clientOrigin;
+    const clientOriginIsHttps = typeof firstOrigin === 'string' && firstOrigin.startsWith('https://');
+    
     this.app.use(
       session({
         store: sessionStore,
