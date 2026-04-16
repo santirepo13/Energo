@@ -25,6 +25,12 @@ export const createAuthRoutes = (authService: AuthService, authMiddleware: Retur
         console.error('Error saving session:', err);
         return res.status(500).json({ error: 'Session error' });
       }
+      
+      // Force Set-Cookie header to be properly flushed before response ends
+      res.on('finish', () => {
+        setTimeout(() => {}, 2);
+      });
+      
       res.json({ message: 'Login successful' });
     });
   });
