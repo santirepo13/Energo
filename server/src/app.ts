@@ -65,25 +65,18 @@ export class App {
   private setupMiddleware(): void {
     const config = loadAppConfig();
     const securityMiddleware = createSecurityMiddleware({
-      clientOrigin: config.clientOrigin as string,
-      sessionSecret: config.sessionSecret,
-      corsCredentials: true,
-    });
+  clientOrigin: config.clientOrigin as string,
+  sessionSecret: config.sessionSecret,
+  corsCredentials: true,
+});
 
-    // CORS must be first to handle preflight OPTIONS requests
-    this.app.use(cors(securityMiddleware.cors()));
-    this.app.use((req, res, next) => {
-      if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-      }
-      next();
-    });
+// CORS must be first to handle preflight OPTIONS requests
+this.app.use(cors(securityMiddleware.cors()));
+this.app.use(express.json());
+this.app.use(express.urlencoded({ extended: true }));
 
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
-
-    this.app.use(securityMiddleware.securityHeaders);
-    this.app.use(securityMiddleware.blockHiddenFiles);
+this.app.use(securityMiddleware.securityHeaders);
+this.app.use(securityMiddleware.blockHiddenFiles);
 
     const sessionStore = new MySQLSessionStore(getDatabaseFunction());
     // clientOrigin can be string or array, check first origin for protocol
