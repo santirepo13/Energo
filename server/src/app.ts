@@ -70,10 +70,18 @@ export class App {
       corsCredentials: true,
     });
 
+    // CORS must be first to handle preflight OPTIONS requests
+    this.app.use(cors(securityMiddleware.cors()));
+    this.app.use((req, res, next) => {
+      if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+      }
+      next();
+    });
+
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    this.app.use(cors(securityMiddleware.cors()));
     this.app.use(securityMiddleware.securityHeaders);
     this.app.use(securityMiddleware.blockHiddenFiles);
 
