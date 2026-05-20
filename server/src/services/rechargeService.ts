@@ -19,53 +19,6 @@ export class RechargeService {
       throw new Error('No energy card for user with that card_number');
     }
     
-    // Handle pin code recharge flow
-    if (pinCode) {
-      // For pin code recharges, use the provided balance and kwh values
-      const [pinResult]: any = await this.db(
-        'SELECT amount, kwh FROM recharge_pins WHERE pin_code = ? AND user_id = ?',
-        [pinCode, userId]
-      );
-      
-      if (!Array.isArray(pinResult) || pinResult.length === 0) {
-        throw new Error('Invalid pin code');
-      }
-      
-      const pinData = pinResult[0];
-      const calculatedAmount = pinData.amount;
-      const calculatedKwh = pinData.kwh;
-
-      if (!Number.isFinite(calculatedAmount) || !Number.isFinite(calculatedKwh)) {
-        throw new Error('Invalid pin data: amount and kwh must be finite numbers');
-      }
-      
-      const newBalance = Number(card.current_balance) + calculatedAmount;
-      const newKwh = Number(card.current_kwh) + calculatedKwh;
-      
-      const roundedNewKwh = Math.round(newKwh * 100) / 100;
-      
-      if (!Number.isFinite(newBalance) || !Number.isFinite(roundedNewKwh)) {
-        throw new Error('Invalid card balance or kwh values');
-      }
-      
-      await this.db('CALL sp_energy_cards_update_balance(?, ?, ?, ?)', [userId, cardNumber, newBalance, roundedNewKwh]);
-      
-      // Fetch the actual updated balance from the database
-      const [updatedCardResult]: any = await this.db(
-        'SELECT current_balance, current_kwh FROM energy_cards WHERE user_id = ? AND card_number = ?',
-        [userId, cardNumber]
-      );
-      
-      if (!Array.isArray(updatedCardResult) || updatedCardResult.length === 0) {
-        throw new Error('Failed to retrieve updated card balance');
-      }
-      
-      const actualBalance = updatedCardResult[0].current_balance;
-      const actualKwh = updatedCardResult[0].current_kwh;
-      
-      return { pin: pinCode, balance: actualBalance, kwh: actualKwh };
-    }
-    
     // Original amount/kwh recharge flow
     // Calculate the missing value based on the provided one
     let calculatedAmount = amount;

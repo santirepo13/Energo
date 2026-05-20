@@ -34,7 +34,12 @@ export default function Login() {
       await login({ username, password });
       setSuccess('Inicio de sesión exitoso');
       window.dispatchEvent(new Event('auth-changed'));
-      setTimeout(() => navigate('/dashboard'), 500);
+      // Wait full browser event loop cycles to ensure cookie is fully persisted before navigation
+      setTimeout(() => {
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 100);
+      }, 0);
     } catch (err: any) {
       const code = err?.response?.data?.code;
       if (code === 'PAUSE_VERIFICATION_REQUIRED') {

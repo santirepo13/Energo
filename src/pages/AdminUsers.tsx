@@ -54,7 +54,6 @@ export default function AdminUsers() {
         String(u.id),
         u.username || '',
         u.email || '',
-        u.role || '',
         u.status || '',
         u.created_at || '',
         u.last_login || '',
@@ -87,7 +86,7 @@ export default function AdminUsers() {
         >
           <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
           <InputBase
-            placeholder="Buscar por id, usuario, correo, estado, rol…"
+            placeholder="Buscar por id, usuario, correo, estado…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             sx={{ flex: 1 }}
@@ -116,7 +115,6 @@ export default function AdminUsers() {
               <TableRow>
                 <TableCell>Usuario</TableCell>
                 <TableCell>Correo</TableCell>
-                <TableCell>Rol</TableCell>
                 <TableCell>Estado</TableCell>
               </TableRow>
             </TableHead>
@@ -141,9 +139,6 @@ export default function AdminUsers() {
                     <Typography>{u.email || '—'}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip label={u.role || 'N/A'} size="small" />
-                  </TableCell>
-                  <TableCell>
                     <Chip
                       size="small"
                       color={
@@ -161,13 +156,13 @@ export default function AdminUsers() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    Sin usuarios.
-                  </TableCell>
-                </TableRow>
-              )}
+                {filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} align="center">
+                      Sin usuarios.
+                    </TableCell>
+                  </TableRow>
+                )}
             </TableBody>
           </Table>
         </Paper>

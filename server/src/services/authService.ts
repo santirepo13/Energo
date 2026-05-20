@@ -40,12 +40,47 @@ export class AuthService {
 
   async register(userData: any): Promise<{ userId: number; cardNumber: string | null }> {
     try {
-      // Create user directly without transaction
-      const userId = await this.createUserDirect(userData);
-      
-      // Create energy card directly without transaction
-      const cardNumber = await this.createEnergyCardDirect(userId, userData.card_number);
-      
+      let roleId = userData.role_id || 3; // Default to normal user (role_id=3)
+      let employeeCodeId: number | null = null;
+
+      // If employee code is provided, validate it and get the associated role
+      if (userData.employee_code) {
+        const code = String(userData.employee_code).trim();
+        if (!code) {
+          throw new Error('El código de empleado es obligatorio');
+        }
+
+        // Look up the employee code (locks row for update)
+        const employeeCode = await this.employeeCodeRepository.getEmployeeCode(code);
+        
+        if (!employeeCode) {
+          throw new Error('Código de empleado no válido');
+        }
+
+        if (employeeCode.used) {
+          throw new Error('Código de empleado ya ha sido utilizado');
+        }
+
+        // Use the role_id from the employee code
+        roleId = employeeCode.role_id;
+        employeeCodeId = employeeCode.id;
+      }
+
+      // Create user with the determined role_id
+      const userId = await this.createUserDirect({ ...userData, role_id: roleId });
+
+      // Create energy card (only if not registering with employee code)
+      let cardNumber: string | null = null;
+      if (!userData.employee_code && userData.card_number) {
+        cardNumber = await this.createEnergyCardDirect(userId, userData.card_number);
+      }
+
+      // Mark employee code as used if one was provided
+      if (employeeCodeId !== null) {
+        const usageId = await this.employeeCodeRepository.createEmployeeCodeUsage(employeeCodeId, userId);
+        await this.employeeCodeRepository.markEmployeeCodeUsed(employeeCodeId, usageId);
+      }
+
       return { userId, cardNumber };
     } catch (error) {
       throw error;
@@ -140,26 +175,37 @@ export class AuthService {
     const password_hash = await bcrypt.hash(userData.password, 10);
     const [rows]: any = await this.db(
       'CALL sp_users_insert(?, ?, ?, ?, ?)',
-      [userData.username, password_hash, userData.email, userData.role_id || 2, userData.status_id || 1]
+      [userData.username, password_hash, userData.email, userData.role_id || 3, userData.status_id || 1]
     );
-    return Number((rows[0] || {}).inserted_id);
+    // rows structure: [[{ inserted_id: N }], OkPacket] - need rows[0][0] to get the row object
+    const firstSet = Array.isArray(rows) ? rows[0] : rows;
+    const insertedId = Number(firstSet && firstSet.length ? firstSet[0].inserted_id : undefined);
+    if (!Number.isInteger(insertedId) || insertedId <= 0) {
+      throw new Error('Failed to retrieve inserted user ID');
+    }
+    return insertedId;
   }
 
   private async createEnergyCardDirect(userId: number, cardNumber: string | null): Promise<string | null> {
-    if (!cardNumber) return null;
+    // Sanitize cardNumber: reject NaN, non-string types, and empty/whitespace-only strings
+    if (!cardNumber || typeof cardNumber !== 'string' || cardNumber.trim() === '') {
+      return null;
+    }
+    
+    const sanitizedCardNumber = cardNumber.trim();
     
     try {
-      const card = await this.findEnergyCardDirect(cardNumber);
+      const card = await this.findEnergyCardDirect(sanitizedCardNumber);
       if (card) {
         if (card.user_id == null) {
           await this.db('CALL sp_energy_cards_claim_released_by_id(?, ?, ?)', [card.id, userId, null]);
-          return cardNumber;
+          return sanitizedCardNumber;
         } else {
           throw new Error('Medidor ya enlazado, por favor contacte a soporte');
         }
       } else {
-        await this.db('CALL sp_energy_cards_insert(?, ?, ?)', [userId, cardNumber, null]);
-        return cardNumber;
+        await this.db('CALL sp_energy_cards_insert(?, ?, ?)', [userId, sanitizedCardNumber, null]);
+        return sanitizedCardNumber;
       }
     } catch (e: any) {
       if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
@@ -169,13 +215,13 @@ export class AuthService {
     }
   }
 
-  private async findEnergyCardDirect(cardNumber: string): Promise<any | null> {
-    try {
-      const [rows]: any = await this.db(
-        'CALL sp_energy_cards_find_by_card_number(?)',
-        [cardNumber]
-      );
-      return Array.isArray(rows) && rows.length ? rows[0] : null;
+   private async findEnergyCardDirect(cardNumber: string): Promise<any | null> {
+     try {
+       const [rows]: any = await this.db(
+         'CALL sp_energy_cards_find_by_card_number(?)',
+         [cardNumber]
+       );
+       return Array.isArray(rows) && rows.length && Array.isArray(rows[0]) && rows[0].length ? rows[0][0] : null;
     } catch (e: any) {
       if (e?.code === 'ER_CANT_AGGREGATE_2COLLATIONS' || String(e?.sqlMessage || e?.message || '').includes('Illegal mix of collations')) {
         return await this.findEnergyCardRawDirect(cardNumber);

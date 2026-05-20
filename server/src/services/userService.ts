@@ -66,7 +66,7 @@ export class UserService {
       throw new Error('Estado no disponible');
     }
     
-    await this.userRepository.updateStatus(userId, statusRow.id);
+    await this.userRepository.updateStatusByName(userId, status);
   }
 
   private documentChanged(currentProfile: UserProfile | null, newProfile: any): boolean {

@@ -57,6 +57,19 @@ export const createAuditRoutes = (auditService: AuditService, userService: UserS
     }
   });
 
+  // Update admin status (auditor only)
+  router.patch('/admins/:id/status', requireAudit, createValidationMiddleware().validate('statusUpdate'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      await userService.updateStatus(Number(id), status);
+      res.json({ message: 'Status updated' });
+    } catch (e: any) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to update status';
+      res.status(400).json({ error: errorMessage });
+    }
+  });
+
   // Get audit employees (auditor only)
   router.get('/employees', requireAudit, async (req, res) => {
     try {

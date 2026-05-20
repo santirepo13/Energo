@@ -19,7 +19,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditAttributesIcon from '@mui/icons-material/EditAttributes';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, auditGetAdmins, auditGetAdminProfile } from '../api/client';
+import { api, auditGetAdmins, auditGetAdminProfile, auditUpdateAdminStatus } from '../api/client';
 import type { AdminUserRow, UpdateProfileRequest, UserProfile } from '../api/client';
 
 const DOC_TYPES = ['CC','CE','Pasaporte','PEP','RIF'] as const;
@@ -166,7 +166,7 @@ export default function AuditAdminDetail() {
     setError(null);
     setSuccess(null);
     try {
-      // This endpoint does not exist in backend, so we'll skip the call
+      await auditUpdateAdminStatus(userId, next);
       setUser({ ...user, status: next });
       setSuccess('Estado actualizado');
     } catch (e: any) {

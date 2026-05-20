@@ -317,12 +317,6 @@ function App() {
         </Routes>
       </Container>
 
-      <Box component="footer" sx={{ py: 2, textAlign: 'center', color: '#666' }}>
-        <Typography variant="body2">
-          Proyecto Educativo por Santiago Restrepo Nivel Explorador
-        </Typography>
-      </Box>
-
       {isRegularUser && authenticated === true && !['/login', '/register', '/reset-password'].includes(location.pathname) && ((location.pathname.startsWith('/me') ? waitingForProfile : (showProfilePrompt || waitingForProfile))) && (
         <Box sx={{ position: 'fixed', inset: 0, zIndex: 1300, bgcolor: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center' }}>
           {showProfilePrompt && !location.pathname.startsWith('/me') && (

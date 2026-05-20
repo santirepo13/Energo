@@ -35,7 +35,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_admin_list_users` ()   BEGIN
   FROM users u
   LEFT JOIN roles r ON r.id = u.role_id
   LEFT JOIN statuses s ON s.id = u.status_id
-  WHERE r.name COLLATE utf8mb4_general_ci <> 'audit'
+  WHERE r.name COLLATE utf8mb4_general_ci = 'user'
   ORDER BY u.created_at DESC;
 END$$
 
@@ -102,6 +102,7 @@ END$$
 DROP PROCEDURE IF EXISTS `sp_employee_codes_insert`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_employee_codes_insert` (IN `p_code` VARCHAR(100), IN `p_role_id` INT)   BEGIN
   INSERT INTO employee_codes (code, role_id, used) VALUES (p_code, p_role_id, 0);
+  SELECT LAST_INSERT_ID() AS inserted_id;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_employee_codes_list`$$
@@ -131,6 +132,7 @@ END$$
 DROP PROCEDURE IF EXISTS `sp_employee_code_usages_insert`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_employee_code_usages_insert` (IN `p_employee_code_id` INT, IN `p_user_id` INT)   BEGIN
   INSERT INTO employee_code_usages (employee_code_id, user_id) VALUES (p_employee_code_id, p_user_id);
+  SELECT LAST_INSERT_ID() AS inserted_id;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_energy_cards_claim_released_by_id`$$
@@ -450,6 +452,7 @@ DROP PROCEDURE IF EXISTS `sp_users_insert`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_users_insert` (IN `p_username` VARCHAR(50), IN `p_password_hash` VARCHAR(255), IN `p_email` VARCHAR(100), IN `p_role_id` INT, IN `p_status_id` INT)   BEGIN
   INSERT INTO users (username, password_hash, email, role_id, status_id)
   VALUES (p_username, p_password_hash, p_email, p_role_id, p_status_id);
+  SELECT LAST_INSERT_ID() AS inserted_id;
 END$$
 
 DROP PROCEDURE IF EXISTS `sp_users_select_login_by_username`$$
@@ -796,6 +799,15 @@ CREATE TABLE IF NOT EXISTS `roles` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`name`, `description`) VALUES
+('admin', 'Administrator role with full access'),
+('audit', 'Audit role for compliance and monitoring'),
+('user', 'Standard user role');
 
 --
 -- RELATIONSHIPS FOR TABLE `roles`:
