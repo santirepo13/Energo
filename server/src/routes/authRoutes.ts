@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { createValidationMiddleware } from '../middleware/validation';
 import { createAuthMiddleware } from '../middleware/auth';
 import { AuthService } from '../services/authService';
+import { logSecurityEvent, getClientIP } from '../config/security';
+import { getDatabaseFunction } from '../database/databasePool';
 
 console.log('Cargando rutas de autenticación');
 
@@ -10,10 +12,16 @@ export const createAuthRoutes = (authService: AuthService, authMiddleware: Retur
 
   router.post('/login', createValidationMiddleware().validate('login'), async (req, res) => {
     const { username, password } = req.body;
+    const ip = getClientIP(req);
+    const db = getDatabaseFunction();
+    
     const user = await authService.login(username, password);
     if (!user) {
+      await logSecurityEvent(db, 'LOGIN_FAILED', username, ip, 'Invalid credentials');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    
+    await logSecurityEvent(db, 'LOGIN_SUCCESS', username, ip, `User ID: ${user.id}, Role: ${user.role_name}`);
     
     (req.session as any).userId = user.id;
     (req.session as any).username = user.username;
@@ -44,7 +52,14 @@ export const createAuthRoutes = (authService: AuthService, authMiddleware: Retur
     }
   });
 
-  router.post('/logout', authMiddleware.requireAuth, (req, res) => {
+  router.post('/logout', authMiddleware.requireAuth, async (req, res) => {
+    const username = (req.session as any)?.username as string;
+    const ip = getClientIP(req);
+    const db = getDatabaseFunction();
+    const userId = (req.session as any)?.userId;
+    
+    await logSecurityEvent(db, 'LOGOUT', username || null, ip, `User ID: ${userId}`);
+    
     (req.session as any).destroy(() => {
       res.json({ message: 'Logged out' });
     });
