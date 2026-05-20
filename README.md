@@ -1,4 +1,8 @@
-# Energo (EnergoMobile)
+# Energo
+
+<p align="center">
+  <img src="./src/assets/logo.png" alt="Energo Logo" width="120">
+</p>
 
 Sistema de gestión de energía prepagada que permite a los usuarios administrar su consumo energético a través de medidores prepagados. Los usuarios pueden registrarse, vincular tarjetas de energía (medidores), recargar crédito por monto en COP, por kWh o mediante código PIN, y consultar su historial de recargas. El sistema soporta tres roles — Usuario Regular, Administrador y Auditor — cada uno con paneles y capacidades específicas.
 
@@ -238,6 +242,20 @@ Variables de entorno del backend (ver `server/.env.example`):
 | ------------------ | ------------------------- |
 | `npx expo start`   | Iniciar herramientas de desarrollo Expo |
 | `npx expo build`   | Compilar para producción  |
+
+---
+
+## Diagramas
+
+| Diagrama | Descripción | Enlace |
+| -------- | ----------- | ------ |
+| Flujo de Autenticación | Proceso de inicio de sesión y validación de sesión | [Ver diagrama](https://tinyurl.com/energoFlujoAutenticacion) |
+| Flujo de Registro | Proceso de registro de nuevos usuarios | [Ver diagrama](https://tinyurl.com/energoFlujoRegistro) |
+| Flujo de Recargas | Proceso de recarga de energía (COP, kWh, PIN) | [Ver diagrama](https://tinyurl.com/energoFlujoRecargas) |
+| Flujo de Perfil | Gestión de datos personales del usuario | [Ver diagrama](https://tinyurl.com/energoFlujoPerfil) |
+| Flujo de Administrador | Gestión de usuarios, medidores y precios | [Ver diagrama](https://tinyurl.com/energoFlujoAdministrador) |
+| Diagrama Entidad-Relación | Modelo de datos y relaciones de la base de datos | [Ver diagrama](https://tinyurl.com/energoEntidadRelacion) |
+| Diagrama de Componentes | Arquitectura de componentes del sistema | [Ver diagrama](https://tinyurl.com/energocomponentes) |
 
 ---
 
