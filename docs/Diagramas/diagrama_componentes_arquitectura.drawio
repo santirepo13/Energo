@@ -1,0 +1,75 @@
+<mxfile host="app.diagrams.net" agent="ChatGPT">
+  <diagram id="994749531737" name="Diagrama de Componentes - Arquitectura lógica">
+    <mxGraphModel dx="1308" dy="763" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="v2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;fontStyle=1;spacing=12;" value="Diagrama de Componentes: Arquitectura lógica y tecnologías" vertex="1">
+          <mxGeometry height="60" width="880" x="420" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="v3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffffff;strokeColor=#222222;fontSize=14;spacing=10;" value="&lt;b&gt;App móvil&lt;/b&gt;&lt;br&gt;React Native / Expo&lt;br&gt;Pantallas: Login, Register, Dashboard, Profile, Security" vertex="1">
+          <mxGeometry height="170" width="360" x="80" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="v4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffffff;strokeColor=#222222;fontSize=14;spacing=10;" value="&lt;b&gt;App web&lt;/b&gt;&lt;br&gt;React / Material-UI&lt;br&gt;Vistas: Dashboard, AdminUsers, AuditEmployees" vertex="1">
+          <mxGeometry height="170" width="360" x="80" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="v5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;spacing=10;" value="&lt;b&gt;Transporte HTTPS&lt;/b&gt;&lt;br&gt;Cookies httpOnly&lt;br&gt;CORS con credenciales" vertex="1">
+          <mxGeometry height="170" width="320" x="520" y="315" as="geometry" />
+        </mxCell>
+        <mxCell id="v6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;spacing=10;" value="&lt;b&gt;Backend REST API&lt;/b&gt;&lt;br&gt;Node.js / Express&lt;br&gt;Rutas auth, user, meters, recharge, admin, audit" vertex="1">
+          <mxGeometry height="240" width="420" x="940" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="v7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffffff;strokeColor=#222222;fontSize=14;spacing=10;" value="&lt;b&gt;Validación y seguridad&lt;/b&gt;&lt;br&gt;Joi, RBAC, sesiones, bcrypt, headers de seguridad" vertex="1">
+          <mxGeometry height="170" width="380" x="1460" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="v8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffffff;strokeColor=#222222;fontSize=14;spacing=10;" value="&lt;b&gt;Servicios de negocio&lt;/b&gt;&lt;br&gt;Registro, perfil, medidores, recargas, administración, auditoría" vertex="1">
+          <mxGeometry height="190" width="380" x="1650" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="v9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffffff;strokeColor=#222222;fontSize=14;spacing=10;" value="&lt;b&gt;Servicio STS-20&lt;/b&gt;&lt;br&gt;PIN de 20 dígitos&lt;br&gt;HMAC-SHA256&lt;br&gt;Dígito Luhn" vertex="1">
+          <mxGeometry height="170" width="380" x="1460" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="v10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;spacing=10;" value="&lt;b&gt;MySQL&lt;/b&gt;&lt;br&gt;Tablas, constraints, transacciones y stored procedures" vertex="1">
+          <mxGeometry height="170" width="420" x="940" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="v11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;spacing=10;" value="&lt;b&gt;Auditoría persistente&lt;/b&gt;&lt;br&gt;security_logs&lt;br&gt;kwh_price_history&lt;br&gt;recharge_pins" vertex="1">
+          <mxGeometry height="170" width="320" x="440" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="v3" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v5" value="solicitudes API">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="v4" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v5" value="solicitudes API">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="v5" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v6" value="REST JSON">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="v6" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v7" value="valida entrada y acceso">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="v6" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v8" value="invoca casos de uso">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" edge="1" parent="1" source="v8" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v9" value="genera PIN">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" edge="1" parent="1" source="v8" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v10" value="lee/escribe datos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1150" y="530" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e19" edge="1" parent="1" source="v9" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v10" value="guarda PIN">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" edge="1" parent="1" source="v10" style="endArrow=block;html=1;rounded=0;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;jettySize=auto;orthogonalLoop=1;" target="v11" value="registros históricos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="760" y="795" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
