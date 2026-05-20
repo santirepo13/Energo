@@ -4,6 +4,11 @@
   <img src="./src/assets/logo.png" alt="Energo Logo" width="120">
 </p>
 
+<p align="center">
+  <a href="https://energoapi.gosr.lol"><strong>API</strong></a> ·
+  <a href="https://energo.gosr.lol"><strong>Frontend</strong></a>
+</p>
+
 Sistema de gestión de energía prepagada que permite a los usuarios administrar su consumo energético a través de medidores prepagados. Los usuarios pueden registrarse, vincular tarjetas de energía (medidores), recargar crédito por monto en COP, por kWh o mediante código PIN, y consultar su historial de recargas. El sistema soporta tres roles — Usuario Regular, Administrador y Auditor — cada uno con paneles y capacidades específicas.
 
 ---
