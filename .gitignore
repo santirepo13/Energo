@@ -25,3 +25,7 @@ dist-ssr
 .kilocode/system-prompt-code
 .kilocode/
 server/tsconfig.tsbuildinfo
+
+# Large binaries
+*.apk
+*.zip
